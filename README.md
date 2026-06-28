@@ -11,7 +11,13 @@ de baile: alumnos, profesores, clases, asistencias por QR, cuponeras, pagos y de
 - **Auth:** Supabase Auth + validación de JWT en .NET.
 
 ## Estado actual
-🟡 **Fase de análisis y diseño.** Todavía NO se escribe código de la aplicación.
+🟢 **En desarrollo.** Las tres capas existen y compilan:
+- `db/` — migraciones SQL para Supabase (esquema, índices, RLS, vistas, seed).
+- `backend/` — .NET 8 en capas, con reglas de asistencia/cuponeras y **12 tests en verde**.
+- `frontend/` — Next.js 14 con la pantalla de check-in de recepción.
+
+Ver `NOTAS_CAMBIOS.txt` para el detalle de avances y `backend/README.md` / `frontend/README.md`
+para correr cada parte.
 
 ## Documentación (`/docs`)
 1. [`01-ANALISIS-Y-ARQUITECTURA.md`](docs/01-ANALISIS-Y-ARQUITECTURA.md) — Modelo de dominio,

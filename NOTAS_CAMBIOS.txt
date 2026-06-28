@@ -133,6 +133,29 @@ PENDIENTE (próximas iteraciones):
   - Tokens QR dinámicos (Modo B).
   - Ajuste de la vista student_balance por [D12].
 
+--------------------------------------------------------------------------
+2026-06-28 — Frontend Next.js (scaffold + pantalla de check-in)
+--------------------------------------------------------------------------
+[E4] FRONTEND (carpeta frontend/) — Next.js 14 + TypeScript + Tailwind.
+      Compila OK (npm run build). Rutas generadas: / y /checkin.
+      - lib/supabase.ts: cliente Supabase LAZY (se crea al primer uso para no
+        romper el prerender cuando faltan envs) + obtención del JWT.
+      - lib/api.ts: cliente del backend .NET que adjunta el Bearer JWT.
+      - components/QrScanner.tsx: escáner de QR por cámara (html5-qrcode,
+        carga dinámica sin SSR).
+      - app/checkin/page.tsx: pantalla de check-in de recepción (modo primario:
+        escanea el QR del alumno) con ingreso manual de respaldo y feedback
+        (ok / observación / error / idempotencia).
+      - app/page.tsx: landing con accesos por rol (resto "próximamente").
+      - public/manifest.json + metadata: PWA-ready (faltan iconos y SW).
+
+DECISIÓN: [D14] El cliente Supabase del frontend se inicializa de forma lazy
+      con fallback inocuo para que `next build` no falle sin variables de
+      entorno. Las envs reales van en .env.local (ver .env.local.example).
+
+ESTADO GENERAL: las TRES capas existen y compilan:
+      db/ (SQL Supabase) + backend/ (.NET 8, 12 tests verdes) + frontend/ (Next.js).
+
 ==========================================================================
  (Agregar nuevas entradas debajo, en orden cronológico)
 ==========================================================================
