@@ -156,6 +156,43 @@ DECISIÓN: [D14] El cliente Supabase del frontend se inicializa de forma lazy
 ESTADO GENERAL: las TRES capas existen y compilan:
       db/ (SQL Supabase) + backend/ (.NET 8, 12 tests verdes) + frontend/ (Next.js).
 
+--------------------------------------------------------------------------
+2026-06-28 — Panel del profesor + verificación visual (cierra el ciclo)
+--------------------------------------------------------------------------
+Iteración elegida por el cliente. Cierra el flujo de asistencia de punta a punta.
+
+[E5] BACKEND — nuevos casos de uso y endpoints (compila OK):
+      - IPhotoStorage + SupabasePhotoStorage: URLs firmadas de fotos vía REST de
+        Supabase Storage (degrada a null si no está configurado; no rompe el flujo).
+      - StudentSummaryService: resumen del alumno (nombre, foto firmada, clases
+        restantes, pase libre, deuda, pendientes). La deuda combina saldos
+        negativos + asistencias confirmadas no cubiertas (resuelve parte de D12).
+      - CheckInResult ahora incluye StudentId.
+      - Endpoints nuevos:
+          GET  /api/sessions/today                 (clases de hoy + conteos)
+          GET  /api/sessions/{id}/attendances      (lista con verificación visual)
+          GET  /api/students/{id}/summary          (resumen del alumno)
+          POST /api/checkin/qr  -> ahora devuelve { result, student } (foto+nombre+saldo)
+      - AttendanceController quedó solo con acciones (confirm/confirm-many/reject/
+        correct); la lista de pendientes se movió a SessionsController.
+
+[E6] FRONTEND — panel del profesor y verificación visual (compila OK):
+      - components/StudentCard.tsx: foto (o iniciales) + nombre + saldo/deuda.
+      - /checkin: tras escanear muestra la tarjeta del alumno para verificación.
+      - /teacher: lista de clases de hoy con pendientes/confirmadas.
+      - /teacher/session/[id]: lista de pendientes con tarjeta del alumno;
+        confirmar individual, "confirmar toda la lista" y corregir (motivo opcional).
+      - Home habilita el acceso al panel del profesor.
+
+CICLO DE ASISTENCIA COMPLETO (E2E a nivel código):
+   check-in por QR (recepción) -> pendiente -> panel del profesor -> confirmar
+   -> consumo de cuponera / deuda -> corrección por compensación. 12 tests verdes.
+
+PENDIENTE PRIORITARIO PARA PODER PROBARLO CORRIENDO:
+   - Login real con Supabase Auth (hoy los endpoints requieren JWT con rol).
+   - Datos: aplicar migraciones en un Supabase real + alta de alumnos/clases.
+   - Endpoint para alta de alumnos con foto (subida a Storage) y CRUD admin.
+
 ==========================================================================
  (Agregar nuevas entradas debajo, en orden cronológico)
 ==========================================================================

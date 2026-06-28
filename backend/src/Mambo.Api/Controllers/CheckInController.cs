@@ -7,13 +7,14 @@ namespace Mambo.Api.Controllers;
 
 [ApiController]
 [Route("api/checkin")]
-public class CheckInController(CheckInService checkIn) : ControllerBase
+public class CheckInController(CheckInService checkIn, StudentSummaryService summaries) : ControllerBase
 {
     public record QrCheckInRequest(string QrCode);
 
     /// <summary>
     /// Modo primario: la academia escanea el QR fijo del alumno (recepción).
-    /// Crea una asistencia pendiente. Requiere rol profesor o admin (operador en puerta).
+    /// Crea una asistencia pendiente y devuelve la verificación visual del alumno
+    /// (foto + nombre + saldo) para que el operador confirme la identidad.
     /// </summary>
     [HttpPost("qr")]
     [Authorize(Policy = "TeacherOrAdmin")]
@@ -22,7 +23,8 @@ public class CheckInController(CheckInService checkIn) : ControllerBase
         try
         {
             var result = await checkIn.RegisterByQrCodeAsync(req.QrCode, AttendanceSource.QrAcademy, ct);
-            return Ok(result);
+            var student = await summaries.GetAsync(result.StudentId, ct);
+            return Ok(new { result, student });
         }
         catch (InvalidOperationException ex)
         {

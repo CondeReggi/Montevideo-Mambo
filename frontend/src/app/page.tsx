@@ -17,9 +17,12 @@ export default function Home() {
           <span className="rounded-xl bg-white border py-3 text-slate-400 cursor-not-allowed">
             Panel del alumno (próximamente)
           </span>
-          <span className="rounded-xl bg-white border py-3 text-slate-400 cursor-not-allowed">
-            Panel del profesor (próximamente)
-          </span>
+          <Link
+            href="/teacher"
+            className="rounded-xl bg-white border py-3 font-medium text-slate-800 hover:bg-slate-100"
+          >
+            Panel del profesor
+          </Link>
           <span className="rounded-xl bg-white border py-3 text-slate-400 cursor-not-allowed">
             Administración (próximamente)
           </span>

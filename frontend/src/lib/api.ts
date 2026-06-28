@@ -35,9 +35,20 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   return (await res.json()) as T;
 }
 
-// ---- Tipos de respuesta del backend ----
+// ---- Tipos ----
+export interface StudentSummary {
+  studentId: string;
+  fullName: string;
+  photoUrl: string | null;
+  classesRemaining: number;
+  hasActiveUnlimited: boolean;
+  debtClasses: number;
+  pendingAttendances: number;
+}
+
 export interface CheckInResult {
   attendanceId: string;
+  studentId: string;
   status: number;
   isAmbiguous: boolean;
   outOfWindow: boolean;
@@ -45,9 +56,56 @@ export interface CheckInResult {
   message: string;
 }
 
+export interface CheckInResponse {
+  result: CheckInResult;
+  student: StudentSummary | null;
+}
+
+export interface SessionToday {
+  id: string;
+  status: string;
+  startAt: string;
+  endAt: string;
+  className: string;
+  style: string;
+  level: string;
+  pendingCount: number;
+  confirmedCount: number;
+}
+
+export interface SessionAttendance {
+  id: string;
+  studentId: string;
+  status: string;
+  source: string;
+  checkedInAt: string;
+  isAmbiguous: boolean;
+  student: StudentSummary | null;
+}
+
 // ---- Endpoints ----
 export const checkInByQr = (qrCode: string) =>
-  api<CheckInResult>("/api/checkin/qr", {
+  api<CheckInResponse>("/api/checkin/qr", {
     method: "POST",
     body: JSON.stringify({ qrCode }),
   });
+
+export const getTodaySessions = () => api<SessionToday[]>("/api/sessions/today");
+
+export const getSessionAttendances = (sessionId: string, onlyPending = true) =>
+  api<SessionAttendance[]>(`/api/sessions/${sessionId}/attendances?onlyPending=${onlyPending}`);
+
+export const confirmAttendance = (id: string) =>
+  api(`/api/attendance/${id}/confirm`, { method: "POST" });
+
+export const confirmMany = (attendanceIds: string[]) =>
+  api(`/api/attendance/confirm-many`, {
+    method: "POST",
+    body: JSON.stringify({ attendanceIds }),
+  });
+
+export const rejectAttendance = (id: string, reason?: string) =>
+  api(`/api/attendance/${id}/reject`, { method: "POST", body: JSON.stringify({ reason }) });
+
+export const correctAttendance = (id: string, reason?: string) =>
+  api(`/api/attendance/${id}/correct`, { method: "POST", body: JSON.stringify({ reason }) });

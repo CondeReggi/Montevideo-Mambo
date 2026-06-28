@@ -2,13 +2,14 @@
 
 import { useState, useCallback } from "react";
 import dynamic from "next/dynamic";
-import { checkInByQr, CheckInResult, ApiError } from "@/lib/api";
+import { checkInByQr, CheckInResponse, ApiError } from "@/lib/api";
+import StudentCard from "@/components/StudentCard";
 
 const QrScanner = dynamic(() => import("@/components/QrScanner"), { ssr: false });
 
 type Feedback =
-  | { kind: "ok"; result: CheckInResult }
-  | { kind: "warn"; result: CheckInResult }
+  | { kind: "ok"; data: CheckInResponse }
+  | { kind: "warn"; data: CheckInResponse }
   | { kind: "error"; message: string }
   | null;
 
@@ -23,9 +24,9 @@ export default function CheckInPage() {
     setBusy(true);
     setFeedback(null);
     try {
-      const result = await checkInByQr(qr);
-      const kind = result.outOfWindow || result.isAmbiguous ? "warn" : "ok";
-      setFeedback({ kind, result });
+      const data = await checkInByQr(qr);
+      const kind = data.result.outOfWindow || data.result.isAmbiguous ? "warn" : "ok";
+      setFeedback({ kind, data });
     } catch (e) {
       const message = e instanceof ApiError ? e.message : "Error de conexión con el servidor.";
       setFeedback({ kind: "error", message });
@@ -88,19 +89,22 @@ function ResultCard({ feedback }: { feedback: NonNullable<Feedback> }) {
       </div>
     );
   }
-  const { result } = feedback;
+  const { result, student } = feedback.data;
   const warn = feedback.kind === "warn";
   return (
     <div
       className={`rounded-xl border-l-4 p-4 ${
-        warn ? "border-amber-500 bg-amber-50 text-amber-900" : "border-emerald-500 bg-emerald-50 text-emerald-900"
+        warn ? "border-amber-500 bg-amber-50" : "border-emerald-500 bg-emerald-50"
       }`}
     >
-      <p className="font-semibold">
+      {/* Verificación visual: el operador confirma que el QR corresponde a esta persona. */}
+      <div className="bg-white rounded-lg p-3 mb-3 shadow-sm">
+        <StudentCard student={student} />
+      </div>
+      <p className={`font-semibold ${warn ? "text-amber-900" : "text-emerald-900"}`}>
         {result.alreadyExisted ? "Ya estaba registrado" : warn ? "Registrado con observación" : "¡Asistencia registrada!"}
       </p>
-      <p className="text-sm mt-1">{result.message}</p>
-      {/* TODO: mostrar foto + nombre + saldo del alumno para verificación visual (endpoint pendiente). */}
+      <p className={`text-sm mt-1 ${warn ? "text-amber-800" : "text-emerald-800"}`}>{result.message}</p>
     </div>
   );
 }

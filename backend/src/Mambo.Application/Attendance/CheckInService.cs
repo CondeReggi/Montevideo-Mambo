@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Mambo.Application.UseCases;
 
-public record CheckInResult(Guid AttendanceId, AttendanceStatus Status, bool IsAmbiguous,
+public record CheckInResult(Guid AttendanceId, Guid StudentId, AttendanceStatus Status, bool IsAmbiguous,
                             bool OutOfWindow, bool AlreadyExisted, string Message);
 
 /// <summary>
@@ -68,7 +68,7 @@ public class CheckInService(IMamboDbContext db, IClock clock)
         var existing = await db.Attendances
             .FirstOrDefaultAsync(a => a.StudentId == studentId && a.ClassSessionId == target.Id, ct);
         if (existing is not null)
-            return new CheckInResult(existing.Id, existing.Status, existing.IsAmbiguous,
+            return new CheckInResult(existing.Id, studentId, existing.Status, existing.IsAmbiguous,
                 outOfWindow, true, "Ya existía un registro para esta clase.");
 
         var attendance = new Attendance
@@ -89,6 +89,6 @@ public class CheckInService(IMamboDbContext db, IClock clock)
         var msg = outOfWindow ? "Registrado fuera de ventana: pendiente de revisión."
                 : ambiguous ? "Registrado, pero la clase es ambigua: requiere revisión."
                 : "Asistencia registrada como pendiente.";
-        return new CheckInResult(attendance.Id, attendance.Status, ambiguous, outOfWindow, false, msg);
+        return new CheckInResult(attendance.Id, studentId, attendance.Status, ambiguous, outOfWindow, false, msg);
     }
 }

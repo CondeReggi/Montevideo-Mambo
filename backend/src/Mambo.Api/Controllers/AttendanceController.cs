@@ -1,38 +1,17 @@
 using Mambo.Api.Auth;
-using Mambo.Application.Abstractions;
 using Mambo.Application.UseCases;
-using Mambo.Domain;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace Mambo.Api.Controllers;
 
 [ApiController]
 [Route("api/attendance")]
 [Authorize(Policy = "TeacherOrAdmin")]
-public class AttendanceController(
-    AttendanceConfirmationService svc,
-    IMamboDbContext db,
-    ICurrentUser me) : ControllerBase
+public class AttendanceController(AttendanceConfirmationService svc, ICurrentUser me) : ControllerBase
 {
     public record ConfirmManyRequest(List<Guid> AttendanceIds);
     public record ReasonRequest(string? Reason);
-
-    /// <summary>Lista de asistencias pendientes de una sesión (la lista de la clase).</summary>
-    [HttpGet("session/{sessionId:guid}/pending")]
-    public async Task<IActionResult> Pending(Guid sessionId, CancellationToken ct)
-    {
-        var items = await db.Attendances
-            .Where(a => a.ClassSessionId == sessionId && a.Status == AttendanceStatus.Pending)
-            .Select(a => new
-            {
-                a.Id, a.StudentId, a.CheckedInAt, a.Source, a.IsAmbiguous,
-                StudentName = a.Student.User.FullName, a.Student.PhotoPath
-            })
-            .ToListAsync(ct);
-        return Ok(items);
-    }
 
     /// <summary>Confirma una asistencia (descuenta cuponera según política).</summary>
     [HttpPost("{id:guid}/confirm")]

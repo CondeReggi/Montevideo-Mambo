@@ -31,10 +31,13 @@ public static class DependencyInjection
 
         services.AddSingleton<IClock, SystemClock>();
         services.AddScoped<IAuditService, AuditService>();
+        services.AddHttpClient();
+        services.AddScoped<IPhotoStorage, SupabasePhotoStorage>();
 
         // Casos de uso
         services.AddScoped<CheckInService>();
         services.AddScoped<AttendanceConfirmationService>();
+        services.AddScoped<StudentSummaryService>();
 
         return services;
     }
