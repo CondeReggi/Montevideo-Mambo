@@ -1,0 +1,36 @@
+# APP Montevideo MAMBO — Sistema de Gestión para Academia de Baile
+
+Aplicación web (responsive, preparada para PWA/app futura) para la gestión integral de una academia
+de baile: alumnos, profesores, clases, asistencias por QR, cuponeras, pagos y deudas.
+
+## Stack objetivo
+- **Frontend:** React / Next.js (responsive + PWA).
+- **Backend:** .NET 8 Web API (toda la lógica de negocio).
+- **Base de datos:** Supabase PostgreSQL.
+- **Storage:** Supabase Storage (fotos de alumnos, QR imprimibles).
+- **Auth:** Supabase Auth + validación de JWT en .NET.
+
+## Estado actual
+🟡 **Fase de análisis y diseño.** Todavía NO se escribe código de la aplicación.
+
+## Documentación (`/docs`)
+1. [`01-ANALISIS-Y-ARQUITECTURA.md`](docs/01-ANALISIS-Y-ARQUITECTURA.md) — Modelo de dominio,
+   arquitectura, flujos (asistencia, cuponeras, pagos), problemas de negocio, casos borde y mejoras.
+2. [`02-ESQUEMA-BD.md`](docs/02-ESQUEMA-BD.md) — Esquema de tablas, PK/FK, índices, vistas, RLS y
+   reglas transaccionales para Supabase PostgreSQL.
+3. [`03-SUPABASE-STORAGE-Y-AUTH.md`](docs/03-SUPABASE-STORAGE-Y-AUTH.md) — Almacenamiento de fotos y
+   decisión de autenticación.
+
+## Registro de cambios
+Ver [`NOTAS_CAMBIOS.txt`](NOTAS_CAMBIOS.txt) — bitácora de cambios y decisiones grandes.
+
+## Roles
+- **Administrador:** acceso total (alumnos, profesores, clases, cuponeras, pagos, asistencias, confirmaciones, correcciones, extensiones).
+- **Profesor:** ve todas las clases, confirma y corrige asistencias.
+- **Alumno:** autogestión (cuponeras, clases consumidas, historial, asistencias, pagos y deudas).
+
+## Decisiones clave
+- Asistencia por **QR + ventana horaria** (`[fin−15min, fin+30min]`), confirmada por el profesor.
+- El **descuento de clases ocurre solo al confirmar** (nunca se impide asistir por falta de saldo → genera deuda).
+- Cuponeras modeladas con **ledger de movimientos** (auditable, soporta saldo negativo y correcciones).
+- Pagos **100% manuales** (sin pasarela).

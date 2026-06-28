@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Mambo.Api/Mambo.Api.csproj" />
+    <Project Path="src/Mambo.Application/Mambo.Application.csproj" />
+    <Project Path="src/Mambo.Domain/Mambo.Domain.csproj" />
+    <Project Path="src/Mambo.Infrastructure/Mambo.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Mambo.Domain.Tests/Mambo.Domain.Tests.csproj" />
+  </Folder>
+</Solution>

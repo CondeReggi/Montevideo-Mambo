@@ -1,0 +1,138 @@
+==========================================================================
+ BITÁCORA DE CAMBIOS — APP Montevideo MAMBO (Academia de Baile)
+ Se registran aquí los cambios y decisiones GRANDES del proyecto.
+==========================================================================
+
+--------------------------------------------------------------------------
+2026-06-28 — Creación del proyecto y fase de análisis
+--------------------------------------------------------------------------
+- Se creó la carpeta del proyecto en el Escritorio:
+    "APP MOntevideo MAMBO"
+  con subcarpeta /docs.
+
+- Se redactó la documentación de análisis (SIN escribir código aún, según
+  lo solicitado):
+    * README.md ............................ índice y resumen del proyecto.
+    * docs/01-ANALISIS-Y-ARQUITECTURA.md ... modelo de dominio, arquitectura,
+        flujos (asistencia, cuponeras, pagos), problemas de negocio, casos
+        borde, mejoras justificadas, modos de QR, reglas de negocio, auth.
+    * docs/02-ESQUEMA-BD.md ................ tablas, PK/FK, índices, vistas,
+        RLS y reglas transaccionales para Supabase PostgreSQL.
+    * docs/03-SUPABASE-STORAGE-Y-AUTH.md ... fotos en Storage + decisión auth.
+
+DECISIONES GRANDES TOMADAS EN ESTA FASE:
+  [D1] Stack: Next.js + .NET 8 Web API + Supabase (Postgres + Storage).
+       El backend .NET es la ÚNICA autoridad de escritura de negocio.
+  [D2] Autenticación: Supabase Auth para identidad/JWT, validado en .NET.
+       Los roles de negocio viven en tablas propias (role/user_role).
+  [D3] Asistencia por ventana horaria [fin-15min, fin+30min]; estados
+       pending/confirmed/rejected/corrected. Descuento SOLO al confirmar.
+  [D4] Cuponeras con LEDGER de movimientos (pass_ledger_entry) en lugar de
+       un contador simple. Permite saldo negativo, deuda, correcciones
+       reversibles y auditoría. pass.balance es caché desnormalizado.
+  [D5] Prioridad de consumo: pase libre (no descuenta) -> pack (FIFO por
+       vencimiento) -> clase suelta -> deuda. Nunca se impide asistir.
+  [D6] Se separa dance_class (plantilla recurrente) de class_session
+       (instancia por fecha) para soportar feriados, suplencias y cancelaciones.
+  [D7] Pagos 100% manuales (sin pasarela). Confirmar pago dispara créditos.
+  [D8] QR: dos modos soportados (academia escanea alumno / alumno escanea
+       academia). QR fijo solo genera "pending", nunca confirma ni descuenta.
+       Verificación visual (foto+nombre) para mitigar uso indebido.
+  [D9] Fotos en bucket privado student-photos; subida vía backend; lectura
+       con signed URLs de corta vida.
+
+PENDIENTE DE CONFIRMAR CON EL NEGOCIO:
+  - ¿Una sola sede/salón hoy? (afecta regla de no-solape y multi-room futuro)
+  - ¿Modo primario de QR: academia->alumno o alumno->academia?
+  - ¿Pase libre por mes calendario o 30 días corridos?
+
+PRÓXIMOS PASOS (no implementados):
+  1. Validar el análisis con el cliente.
+  2. Cerrar esquema SQL definitivo y migraciones.
+  3. Definir grilla de endpoints del Web API.
+  4. Prototipo de pantalla de check-in con verificador visual.
+
+--------------------------------------------------------------------------
+2026-06-28 — Decisiones de negocio confirmadas por el cliente
+--------------------------------------------------------------------------
+Se resolvieron las 3 ambigüedades que estaban pendientes:
+
+  [C1] UNA SOLA SEDE, UN SOLO SALÓN (no multisalón).
+       => No hay clases simultáneas; la ventana horaria identifica la clase
+          sin ambigüedad. La regla de no-solape se simplifica a (weekday +
+          rango horario), SIN dimensión `room`. Se deja `room` previsto en
+          el modelo pero hoy no se usa para distinguir clases.
+       Afecta: 01 §7.1 y §14; 02 §2.5 (room) y §4 (constraint no-solape).
+
+  [C2] LA ACADEMIA ESCANEA AL ALUMNO (Modo A) = MODO PRIMARIO.
+       => Se implementa primero el flujo "recepción escanea el QR del
+          alumno" con verificación visual (foto+nombre). El Modo B (alumno
+          escanea QR de la academia) queda contemplado para el futuro.
+       Afecta: 01 §10.
+
+  [C3] VENCIMIENTO = 30 DÍAS CORRIDOS desde la compra (NO mes calendario).
+       => valid_to = valid_from + 30 días. Aplica a packs Y al pase libre.
+       Afecta: 01 §5.2 y R9; 02 §2.8 (pass_type.validity_days default 30).
+
+Estas decisiones quedan reflejadas en los 3 docs y marcadas como CONFIRMADO.
+
+--------------------------------------------------------------------------
+2026-06-28 — Inicio del desarrollo: capa de datos + backend .NET 8
+--------------------------------------------------------------------------
+Se pasó de diseño a CÓDIGO. Se inicializó repo git en la carpeta del proyecto.
+
+ENTORNO detectado: .NET SDK 10.0.301 (se targetea net8.0), Node 20, npm 10, git.
+
+[E1] BASE DE DATOS (carpeta db/) — migraciones SQL para Supabase PostgreSQL:
+      - 001_extensions_and_enums.sql .. pgcrypto, btree_gist, tipo timerange, 7 enums.
+      - 002_tables.sql ................ 15 tablas con PK/FK, triggers updated_at.
+      - 003_indexes_constraints.sql ... índices + exclusion constraint no-solape
+                                        (weekday + rango horario, una sola sede).
+      - 004_views_and_triggers.sql .... trigger que mantiene pass.balance desde el
+                                        ledger + vistas student_balance y
+                                        attendance_pending_old.
+      - 005_rls.sql ................... RLS de defensa en profundidad + helpers.
+      - seed/001_seed_base.sql ........ roles y tipos de cuponera de ejemplo.
+      Migraciones idempotentes. NO se pudo validar contra Postgres real (Docker
+      Desktop no estaba corriendo); revisión manual aplicada.
+
+[E2] BACKEND .NET 8 (carpeta backend/) — arquitectura en capas (Mambo.slnx):
+      Domain -> Application -> Infrastructure -> Api. COMPILA OK (0 errores).
+      - Domain: 15 entidades + enums + reglas puras:
+          * AttendanceWindow (ventana [fin-15, fin+30]).
+          * ConsumptionPolicy (prioridad pase libre -> pack FIFO -> suelta -> deuda).
+      - Application: CheckInService (detección por ventana, anti-dup, fuera de
+          ventana -> pendiente) y AttendanceConfirmationService (confirmar 1 /
+          confirmar lista / rechazar / corregir por compensación, con auditoría).
+      - Infrastructure: MamboDbContext (EF Core + Npgsql, mapeo de enums de PG),
+          SystemClock, AuditService, DI.
+      - Api: JWT de Supabase (HS256), políticas Admin / TeacherOrAdmin, CORS,
+          Swagger. Controllers: CheckIn y Attendance.
+
+[E3] PRUEBAS (tests/Mambo.Domain.Tests) — 12 tests xUnit, TODOS EN VERDE.
+      Cubren bordes de la ventana horaria y todos los caminos de la política de
+      consumo (pase libre, FIFO, suelta, deuda con/sin cuponera, pase vencido).
+
+DECISIONES DE IMPLEMENTACIÓN (grandes):
+  [D10] El esquema SQL de db/ es la FUENTE DE VERDAD del esquema (no EF Migrations).
+        EF Core mapea contra ese esquema. Se puede agregar EF Migrations luego.
+  [D11] pass.balance se mantiene por DOBLE garantía: la app lo decrementa en memoria
+        y un trigger de BD lo recalcula desde el ledger (convergen al mismo valor).
+  [D12] "Deuda sin cuponera": si el alumno no tiene ninguna cuponera, la asistencia
+        se confirma igual con pass_id NULL y covered_by_unlimited=false (deuda
+        implícita / "no cubierta"). PENDIENTE: extender la vista student_balance
+        para contar también estas asistencias no cubiertas como deuda.
+  [D13] El namespace de casos de uso es Mambo.Application.UseCases (se evitó el
+        choque con la entidad Attendance).
+
+PENDIENTE (próximas iteraciones):
+  - Frontend Next.js (PWA, scanner QR, paneles por rol).
+  - CRUD admin: alumnos, profesores, clases, cuponeras, pagos.
+  - Panel del alumno sobre la vista student_balance.
+  - Subida de fotos a Supabase Storage (URLs firmadas).
+  - Tokens QR dinámicos (Modo B).
+  - Ajuste de la vista student_balance por [D12].
+
+==========================================================================
+ (Agregar nuevas entradas debajo, en orden cronológico)
+==========================================================================
