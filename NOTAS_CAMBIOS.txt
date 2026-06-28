@@ -3,6 +3,52 @@
  Se registran aquí los cambios y decisiones GRANDES del proyecto.
 ==========================================================================
 
+##########################################################################
+#  PENDIENTES (checklist vivo — marcar con [x] al completar)             #
+#  Última actualización: 2026-06-28                                      #
+##########################################################################
+
+--- PARA CORRER / VALIDAR ------------------------------------------------
+[ ] Levantar Docker Desktop (manual) y `docker compose up -d`.
+[ ] Correr el flujo E2E con datos demo (login admin/profe/alumno, check-in,
+    confirmar, ver panel del alumno). Guía en RUN_LOCAL.md.
+
+--- BACKEND / FUNCIONALIDAD ----------------------------------------------
+[ ] Pagos desde el panel admin (registrar/confirmar/cancelar) — hoy solo
+    se crean por el seeder demo. Falta endpoint + UI.
+[ ] Compra de cuponeras desde admin (crear Pass + crédito en ledger al
+    confirmar el pago). Hoy solo por seeder.
+[ ] Gestión de deudas / ver morosos (admin).
+[ ] Extender vencimiento de cuponeras (admin) — endpoint + UI (la regla R9
+    y el ledger 'extension' ya están diseñados).
+[ ] Registrar asistencia manual por el admin (sin check-in previo) — UI.
+[ ] Subida de FOTOS de alumnos a Supabase Storage (alta con foto + URL
+    firmada). Hoy en local se muestran las iniciales.
+[ ] Tokens QR DINÁMICOS (Modo B: el alumno escanea el QR de la academia).
+[ ] Panel de "pendientes antiguas" + recordatorios al profesor (vista
+    attendance_pending_old ya existe).
+[ ] Ajustar la vista SQL student_balance para contar también asistencias
+    confirmadas NO cubiertas como deuda (D12). Hoy lo calcula el backend
+    (StudentSummaryService) pero la vista no.
+
+--- FRONTEND -------------------------------------------------------------
+[ ] Iconos PWA (public/icon-192.png, icon-512.png) + service worker.
+[ ] Guard por rol en /teacher y /checkin (hoy se apoyan en el 401 del API).
+[ ] Mejoras UX del panel del profesor (foto grande, búsqueda, etc.).
+
+--- AUTENTICACIÓN / INFRA ------------------------------------------------
+[ ] Migrar / sumar Supabase Auth (hoy auth propia con JWT — decisión D15).
+[ ] Aplicar migraciones en un proyecto Supabase real (SIN el stub de auth)
+    y configurar cadena de conexión + claves (Storage/Service role).
+[ ] Evaluar EF Migrations como alternativa al SQL de db/ (hoy el SQL es la
+    fuente de verdad del esquema).
+
+--- DECISIONES DE NEGOCIO A CONFIRMAR (si surgen) ------------------------
+[ ] Reglas finas de redondeo/montos de pagos y precios de cuponeras reales.
+[ ] Política de auto-expiración de asistencias pendientes no confirmadas.
+
+##########################################################################
+
 --------------------------------------------------------------------------
 2026-06-28 — Creación del proyecto y fase de análisis
 --------------------------------------------------------------------------
