@@ -38,6 +38,7 @@ public class MamboDbContext(DbContextOptions<MamboDbContext> options) : DbContex
         {
             e.ToTable("app_user");
             e.HasKey(x => x.Id);
+            e.Property(x => x.PasswordHash).HasColumnName("password_hash");
             e.HasMany(x => x.UserRoles).WithOne(x => x.User).HasForeignKey(x => x.UserId);
         });
 

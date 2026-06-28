@@ -16,26 +16,23 @@ builder.Services.AddMamboInfrastructure(builder.Configuration);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 
-// Autenticación: validación del JWT emitido por Supabase Auth.
-var supabaseUrl = builder.Configuration["Supabase:Url"] ?? builder.Configuration["SUPABASE_URL"];
-var jwtSecret = builder.Configuration["Supabase:JwtSecret"] ?? builder.Configuration["SUPABASE_JWT_SECRET"];
+// Autenticación: JWT propio (HS256). Diseñado para sumar Supabase Auth más adelante.
+var jwtKey = builder.Configuration["Jwt:Key"] ?? "dev-only-insecure-key-change-me-please-32+chars";
+var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "mambo";
+var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "mambo";
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
-        // Supabase firma con HS256 usando el JWT secret del proyecto.
         options.TokenValidationParameters = new TokenValidationParameters
         {
-            ValidateIssuer = !string.IsNullOrEmpty(supabaseUrl),
-            ValidIssuer = string.IsNullOrEmpty(supabaseUrl) ? null : $"{supabaseUrl}/auth/v1",
+            ValidateIssuer = true,
+            ValidIssuer = jwtIssuer,
             ValidateAudience = true,
-            ValidAudience = "authenticated",
+            ValidAudience = jwtAudience,
             ValidateLifetime = true,
-            ValidateIssuerSigningKey = !string.IsNullOrEmpty(jwtSecret),
-            IssuerSigningKey = string.IsNullOrEmpty(jwtSecret)
-                ? null
-                : new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(jwtSecret)),
-            RoleClaimType = "app_role"
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(jwtKey))
         };
     });
 

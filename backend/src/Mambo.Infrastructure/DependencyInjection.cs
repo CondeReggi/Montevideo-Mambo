@@ -26,18 +26,25 @@ public static class DependencyInjection
         dsBuilder.MapEnum<Domain.LedgerReason>("ledger_reason");
         var dataSource = dsBuilder.Build();
 
-        services.AddDbContext<MamboDbContext>(opt => opt.UseNpgsql(dataSource));
+        services.AddDbContext<MamboDbContext>(opt =>
+            opt.UseNpgsql(dataSource).UseSnakeCaseNamingConvention());
         services.AddScoped<IMamboDbContext>(sp => sp.GetRequiredService<MamboDbContext>());
 
         services.AddSingleton<IClock, SystemClock>();
         services.AddScoped<IAuditService, AuditService>();
         services.AddHttpClient();
         services.AddScoped<IPhotoStorage, SupabasePhotoStorage>();
+        services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
+        services.AddSingleton<IJwtIssuer, JwtIssuer>();
 
         // Casos de uso
         services.AddScoped<CheckInService>();
         services.AddScoped<AttendanceConfirmationService>();
         services.AddScoped<StudentSummaryService>();
+        services.AddScoped<AuthService>();
+        services.AddScoped<AdminService>();
+        services.AddScoped<StudentPanelService>();
+        services.AddScoped<DevSeeder>();
 
         return services;
     }
