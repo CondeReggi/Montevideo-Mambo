@@ -16,6 +16,12 @@ de baile: alumnos, profesores, clases, asistencias por QR, cuponeras, pagos y de
 - `backend/` — .NET 8 en capas, con reglas de asistencia/cuponeras y **12 tests en verde**.
 - `frontend/` — Next.js 14 con la pantalla de check-in de recepción.
 
+**Funcionalidad lista (a nivel código):** login por rol, alta de alumnos/profesores/clases,
+check-in por QR con verificación visual, panel del profesor (confirmar/corregir) y panel del alumno.
+
+➡️ **Para correr todo local en minutos: ver [`RUN_LOCAL.md`](RUN_LOCAL.md)** (Postgres en Docker +
+backend + frontend, con datos demo y usuarios de prueba).
+
 Ver `NOTAS_CAMBIOS.txt` para el detalle de avances y `backend/README.md` / `frontend/README.md`
 para correr cada parte.
 

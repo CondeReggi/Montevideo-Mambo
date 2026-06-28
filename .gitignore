@@ -4,7 +4,7 @@
 *.user
 *.suo
 .vs/
-appsettings.Development.json
+# appsettings.Development.json se versiona (config LOCAL no secreta para dev).
 appsettings.*.local.json
 
 # ---- Node / Next.js ----

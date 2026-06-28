@@ -193,6 +193,57 @@ PENDIENTE PRIORITARIO PARA PODER PROBARLO CORRIENDO:
    - Datos: aplicar migraciones en un Supabase real + alta de alumnos/clases.
    - Endpoint para alta de alumnos con foto (subida a Storage) y CRUD admin.
 
+--------------------------------------------------------------------------
+2026-06-28 — Login, alta de alumnos/clases, panel del alumno y run local
+--------------------------------------------------------------------------
+[E7] AUTENTICACIÓN PROPIA (decisión [D15]):
+      Para poder probar LOCAL antes de configurar Supabase, se implementó auth
+      propia con JWT (la alternativa ya documentada en análisis §13). Queda
+      preparada para sumar Supabase Auth luego (validación por issuer configurable).
+      - password_hash en app_user (migración 006), hashing PBKDF2-SHA256.
+      - /api/auth/login devuelve JWT + roles + studentId/teacherId.
+      - Program.cs valida JWT propio (Jwt:Key/Issuer/Audience).
+
+[D16] FIX CRÍTICO: se agregó convención snake_case en EF Core
+      (EFCore.NamingConventions). Sin esto el DbContext mapeaba a columnas
+      PascalCase inexistentes. Ahora FullName->full_name, etc.
+
+[E8] ADMIN + PANEL ALUMNO (backend):
+      - AdminService + /api/admin/* : alta de alumnos, profesores, clases y
+        "ensure" de sesiones (calcula ventana en UTC, Montevideo = UTC-3).
+      - StudentPanelService + /api/me/panel : saldo, cuponeras, historial, pagos.
+      - StudentsController /summary y SessionsController ya existentes.
+
+[E9] DEV SEEDER + /api/dev/seed (solo Development):
+      Crea datos demo (admin/profe/2 alumnos, clase de hoy con sesión abierta,
+      cuponeras —una con saldo y otra agotada para ver deuda—, pago y pendientes).
+
+[E10] FRONTEND: login, sesión propia y vistas por rol:
+      - lib/auth.ts (sesión en localStorage) + lib/useAuth.ts (guardia + redirect).
+      - api.ts ahora usa el JWT propio (no Supabase).
+      - /login (con botón "Cargar datos demo"), home consciente de sesión.
+      - /admin, /admin/students, /admin/classes (alta + listado).
+      - /me (panel del alumno).
+      Compila OK (10 rutas).
+
+[E11] RUN LOCAL preparado:
+      - docker-compose.yml: Postgres 16 en localhost:55432, aplica migraciones +
+        seed al primer arranque (cada archivo montado en orden; el init de PG no
+        recurre subdirectorios).
+      - db/_init/00_auth_stub.sql: stub de auth.uid() para Postgres plano (005_rls).
+      - backend/src/Mambo.Api/appsettings.Development.json: conexión local + JWT dev
+        (se versiona: config local NO secreta).
+      - frontend/.env.local: API en 5080. launchSettings: API en 5080.
+      - RUN_LOCAL.md: guía paso a paso + credenciales demo.
+
+VERIFICACIÓN: el backend ARRANCA OK (GET /health -> {"status":"ok"}); el login
+      llega hasta la capa de datos (falla solo por falta de DB, como se espera).
+      NO se pudo levantar Docker Desktop de forma headless (su WSL queda "Stopped";
+      requiere abrir la app manualmente). Queda todo listo para `docker compose up`.
+
+PENDIENTE: levantar Docker Desktop (manual) y correr el flujo E2E con datos demo.
+      Luego: pagos/cuponeras desde admin (UI), fotos a Storage, y migración a Supabase.
+
 ==========================================================================
  (Agregar nuevas entradas debajo, en orden cronológico)
 ==========================================================================

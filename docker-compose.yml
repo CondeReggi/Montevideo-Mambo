@@ -1,0 +1,33 @@
+# PostgreSQL local para desarrollo (mientras no se configura Supabase).
+# Levantar:  docker compose up -d
+# Las migraciones de db/ se aplican solas al primer arranque. El init de Postgres
+# NO recurre subdirectorios, por eso se monta cada archivo en orden explícito.
+services:
+  db:
+    image: postgres:16
+    container_name: mambo-pg
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mambo
+    ports:
+      - "55432:5432"
+    volumes:
+      - mambo_pgdata:/var/lib/postgresql/data
+      # 00: stub de auth (solo local), luego migraciones 01..06, luego seed.
+      - ./db/_init/00_auth_stub.sql:/docker-entrypoint-initdb.d/00_auth_stub.sql:ro
+      - ./db/migrations/001_extensions_and_enums.sql:/docker-entrypoint-initdb.d/01_extensions.sql:ro
+      - ./db/migrations/002_tables.sql:/docker-entrypoint-initdb.d/02_tables.sql:ro
+      - ./db/migrations/003_indexes_constraints.sql:/docker-entrypoint-initdb.d/03_indexes.sql:ro
+      - ./db/migrations/004_views_and_triggers.sql:/docker-entrypoint-initdb.d/04_views.sql:ro
+      - ./db/migrations/005_rls.sql:/docker-entrypoint-initdb.d/05_rls.sql:ro
+      - ./db/migrations/006_auth.sql:/docker-entrypoint-initdb.d/06_auth.sql:ro
+      - ./db/seed/001_seed_base.sql:/docker-entrypoint-initdb.d/20_seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mambo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  mambo_pgdata:

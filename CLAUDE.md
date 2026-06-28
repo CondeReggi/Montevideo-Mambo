@@ -18,7 +18,12 @@ lo apruebe explícitamente.
 - **Backend:** .NET 8 Web API — es la **única autoridad de escritura de negocio**.
 - **Base de datos:** Supabase PostgreSQL.
 - **Storage:** Supabase Storage (fotos de alumnos, QR imprimibles) — buckets privados + signed URLs.
-- **Auth:** Supabase Auth para identidad/JWT, validado en .NET. Roles de negocio en tablas propias.
+- **Auth (actual):** autenticación propia con JWT en .NET (PBKDF2 + `password_hash`), para poder
+  desarrollar/probar local antes de Supabase. Decisión [D15]. Roles de negocio en tablas propias.
+  **A futuro:** integrar Supabase Auth (la validación por issuer es configurable). El diseño original
+  (Supabase Auth) sigue documentado en `docs/03-...` como objetivo.
+- **Correr local:** ver `RUN_LOCAL.md` (Postgres en Docker + `dotnet run` + `npm run dev`).
+  Usuarios demo vía `POST /api/dev/seed`. EF Core usa convención **snake_case** ([D16]).
 - **No usar** Firebase ni NoSQL (la lógica es relacional). No implementar pasarela de pago.
 
 ## Estructura de la carpeta
