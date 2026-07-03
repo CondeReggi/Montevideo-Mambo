@@ -26,13 +26,17 @@ public class MamboDbContext(DbContextOptions<MamboDbContext> options) : DbContex
     protected override void OnModelCreating(ModelBuilder b)
     {
         // Mapear enums de PostgreSQL (deben coincidir con los CREATE TYPE de 001).
-        b.HasPostgresEnum<AppRole>("app_role");
-        b.HasPostgresEnum<AttendanceStatus>("attendance_status");
-        b.HasPostgresEnum<AttendanceSource>("attendance_source");
-        b.HasPostgresEnum<PassKind>("pass_kind");
-        b.HasPostgresEnum<PassStatus>("pass_status");
-        b.HasPostgresEnum<PaymentStatus>("payment_status");
-        b.HasPostgresEnum<LedgerReason>("ledger_reason");
+        // Solo aplica con Npgsql; en SQLite (dev sin Docker) los enums se guardan como int.
+        if (Database.IsNpgsql())
+        {
+            b.HasPostgresEnum<AppRole>("app_role");
+            b.HasPostgresEnum<AttendanceStatus>("attendance_status");
+            b.HasPostgresEnum<AttendanceSource>("attendance_source");
+            b.HasPostgresEnum<PassKind>("pass_kind");
+            b.HasPostgresEnum<PassStatus>("pass_status");
+            b.HasPostgresEnum<PaymentStatus>("payment_status");
+            b.HasPostgresEnum<LedgerReason>("ledger_reason");
+        }
 
         b.Entity<AppUser>(e =>
         {

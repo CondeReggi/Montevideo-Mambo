@@ -3,25 +3,138 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0b0b0c;
+  --foreground: #f4f4f2;
+  --lime: #c4f82b;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: dark;
+  scroll-behavior: smooth;
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  min-height: 100dvh;
+}
+
+/* Textura sutil de fondo (puntos + glow), coherente con la marca */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 55% at 85% -5%, rgba(196, 248, 43, 0.10) 0%, transparent 55%),
+    radial-gradient(50% 50% at -5% 105%, rgba(196, 248, 43, 0.07) 0%, transparent 55%),
+    radial-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 22px 22px;
+}
+
+@layer base {
+  /* Los títulos usan la tipografía de cuerpo (Inter) por defecto para máxima
+     legibilidad; el look "póster" (Anton) se aplica puntualmente con .font-display. */
+  ::selection {
+    background: rgba(196, 248, 43, 0.28);
+    color: #fff;
+  }
+  /* Inputs base */
+  input,
+  select,
+  textarea {
+    color-scheme: dark;
+  }
+}
+
+@layer components {
+  /* Panel / card estándar */
+  .card {
+    @apply rounded-2xl border border-ink-500/70 bg-ink-800/80 backdrop-blur-sm shadow-panel;
+  }
+  .card-hover {
+    @apply transition duration-200 hover:border-lime/40 hover:shadow-glow-sm;
+  }
+
+  /* Botones */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold
+           transition duration-150 disabled:opacity-40 disabled:pointer-events-none select-none;
+  }
+  .btn-primary {
+    @apply btn bg-lime-grad text-ink-900 shadow-glow-sm hover:brightness-110 active:scale-[0.98];
+  }
+  .btn-ghost {
+    @apply btn border border-ink-500 bg-ink-700/50 text-foreground hover:border-lime/40 hover:bg-ink-700;
+  }
+  .btn-danger {
+    @apply btn border border-red-500/40 bg-red-500/10 text-red-300 hover:bg-red-500/20;
+  }
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs rounded-lg;
+  }
+
+  /* Campo de formulario */
+  .field {
+    @apply w-full rounded-xl border border-ink-500 bg-ink-900/70 px-3.5 py-2.5 text-sm text-foreground
+           placeholder:text-muted-dim outline-none transition
+           focus:border-lime/60 focus:ring-2 focus:ring-lime/20;
+  }
+  /* Selects: flecha propia con margen del borde (la nativa queda muy pegada). */
+  select.field {
+    @apply cursor-pointer appearance-none bg-no-repeat pr-10;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%2398989f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+    background-position: right 0.85rem center;
+    background-size: 1.05rem;
+  }
+  .label {
+    @apply mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted;
+  }
+
+  /* Chips / badges */
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold;
+  }
+  .chip-lime {
+    @apply chip bg-lime/15 text-lime;
+  }
+  .chip-amber {
+    @apply chip bg-amber-400/15 text-amber-300;
+  }
+  .chip-red {
+    @apply chip bg-red-500/15 text-red-300;
+  }
+  .chip-muted {
+    @apply chip bg-ink-600 text-muted-soft;
+  }
+
+  /* Título de sección con acento */
+  .eyebrow {
+    @apply text-xs font-bold uppercase tracking-[0.2em] text-lime;
+  }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+  .text-glow {
+    text-shadow: 0 0 12px rgba(196, 248, 43, 0.25);
+  }
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #2c2c33 transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: #2c2c33;
+    border-radius: 999px;
   }
 }

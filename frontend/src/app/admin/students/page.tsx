@@ -1,82 +1,145 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useAuth } from "@/lib/useAuth";
 import { listStudents, createStudent, StudentRow, ApiError } from "@/lib/api";
+import { Shell, PageHeader } from "@/components/ui/TopBar";
+import { Card, Button, Field, Avatar, Badge, Skeleton, EmptyState } from "@/components/ui";
+import { useToast } from "@/components/ui/Toast";
+import { IconPlus, IconSearch, IconUsers, IconChevron } from "@/components/ui/Icons";
+
+const EMPTY = { fullName: "", email: "", password: "", documentId: "", phone: "", qrFixedCode: "" };
 
 export default function AdminStudents() {
   const { ready } = useAuth("admin");
-  const [rows, setRows] = useState<StudentRow[]>([]);
-  const [form, setForm] = useState({ fullName: "", email: "", password: "", documentId: "", qrFixedCode: "" });
-  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
+  const [rows, setRows] = useState<StudentRow[] | null>(null);
+  const [form, setForm] = useState(EMPTY);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
-    try { setRows(await listStudents()); } catch { /* sesión/login */ }
+    try {
+      setRows(await listStudents());
+    } catch {
+      setRows([]);
+    }
   }, []);
 
-  useEffect(() => { if (ready) load(); }, [ready, load]);
+  useEffect(() => {
+    if (ready) load();
+  }, [ready, load]);
+
+  const filtered = useMemo(() => {
+    if (!rows) return [];
+    const q = query.toLowerCase().trim();
+    if (!q) return rows;
+    return rows.filter((s) => s.fullName.toLowerCase().includes(q) || s.email.toLowerCase().includes(q));
+  }, [rows, query]);
 
   const submit = async () => {
-    setBusy(true); setError(null);
+    setBusy(true);
     try {
       await createStudent({
-        fullName: form.fullName, email: form.email, password: form.password,
-        documentId: form.documentId || undefined, qrFixedCode: form.qrFixedCode || undefined,
+        fullName: form.fullName,
+        email: form.email,
+        password: form.password,
+        documentId: form.documentId || undefined,
+        phone: form.phone || undefined,
+        qrFixedCode: form.qrFixedCode || undefined,
       });
-      setForm({ fullName: "", email: "", password: "", documentId: "", qrFixedCode: "" });
+      toast.success("Alumno creado.");
+      setForm(EMPTY);
+      setOpen(false);
       await load();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "No se pudo crear.");
-    } finally { setBusy(false); }
+      toast.error(e instanceof ApiError ? e.message : "No se pudo crear.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   if (!ready) return null;
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900 p-6">
-      <div className="max-w-2xl mx-auto">
-        <a href="/admin" className="text-sm text-slate-500">&larr; Administración</a>
-        <h1 className="text-2xl font-bold mt-2 mb-4">Alumnos</h1>
+    <Shell>
+      <PageHeader
+        eyebrow="Administración"
+        title="Alumnos"
+        subtitle={rows ? `${rows.length} alumno(s) registrados.` : undefined}
+        actions={
+          <Button onClick={() => setOpen((o) => !o)} icon={<IconPlus />}>
+            Nuevo alumno
+          </Button>
+        }
+      />
 
-        <div className="bg-white rounded-xl shadow p-4 mb-6">
-          <h2 className="font-semibold mb-3">Nuevo alumno</h2>
-          <div className="grid sm:grid-cols-2 gap-3">
-            <Input label="Nombre completo" value={form.fullName} onChange={(v) => setForm({ ...form, fullName: v })} />
-            <Input label="Email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} />
-            <Input label="Contraseña" value={form.password} onChange={(v) => setForm({ ...form, password: v })} type="password" />
-            <Input label="Documento (opcional)" value={form.documentId} onChange={(v) => setForm({ ...form, documentId: v })} />
-            <Input label="Código QR fijo (opcional)" value={form.qrFixedCode} onChange={(v) => setForm({ ...form, qrFixedCode: v })} />
+      {open && (
+        <Card className="mb-5 p-5 animate-fade-up">
+          <h2 className="mb-4 font-semibold">Nuevo alumno</h2>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field label="Nombre completo" value={form.fullName} onChange={(v) => setForm({ ...form, fullName: v })} />
+            <Field label="Email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} type="email" />
+            <Field label="Contraseña" value={form.password} onChange={(v) => setForm({ ...form, password: v })} type="password" />
+            <Field label="Teléfono (opcional)" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} />
+            <Field label="Documento (opcional)" value={form.documentId} onChange={(v) => setForm({ ...form, documentId: v })} />
+            <Field label="Código QR fijo (opcional)" value={form.qrFixedCode} onChange={(v) => setForm({ ...form, qrFixedCode: v })} />
           </div>
-          {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
-          <button
-            onClick={submit}
-            disabled={busy || !form.fullName || !form.email || !form.password}
-            className="mt-3 rounded-lg bg-emerald-600 text-white px-4 py-2 font-medium disabled:opacity-50"
-          >
-            Crear alumno
-          </button>
-        </div>
+          <div className="mt-4 flex gap-2">
+            <Button onClick={submit} loading={busy} disabled={!form.fullName || !form.email || !form.password}>
+              Crear alumno
+            </Button>
+            <Button variant="ghost" onClick={() => setOpen(false)}>
+              Cancelar
+            </Button>
+          </div>
+        </Card>
+      )}
 
-        <div className="bg-white rounded-xl shadow divide-y">
-          {rows.length === 0 && <p className="p-4 text-slate-400">Sin alumnos aún.</p>}
-          {rows.map((s) => (
-            <div key={s.id} className="p-3 flex justify-between text-sm">
-              <span className="font-medium">{s.fullName}</span>
-              <span className="text-slate-500">{s.email} · QR {s.qrFixedCode}</span>
-            </div>
+      {/* Buscador */}
+      <div className="relative mb-4">
+        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-dim">
+          <IconSearch />
+        </span>
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Buscar por nombre o email…"
+          className="field pl-9"
+        />
+      </div>
+
+      {rows === null && (
+        <div className="grid grid-cols-1 gap-2">
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} className="h-16" />
           ))}
         </div>
-      </div>
-    </main>
-  );
-}
+      )}
+      {rows !== null && filtered.length === 0 && (
+        <EmptyState icon={<IconUsers />} title="Sin resultados" hint="Probá con otro término o creá un alumno nuevo." />
+      )}
 
-function Input({ label, value, onChange, type = "text" }: { label: string; value: string; onChange: (v: string) => void; type?: string }) {
-  return (
-    <label className="text-sm">
-      <span className="text-slate-600">{label}</span>
-      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} className="w-full border rounded-lg px-3 py-2 mt-1" />
-    </label>
+      <div className="grid grid-cols-1 gap-2">
+        {filtered.map((s) => (
+          <Link key={s.id} href={`/admin/students/${s.id}`}>
+            <Card hover className="flex items-center gap-3 p-3">
+              <Avatar name={s.fullName} size="sm" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium">{s.fullName}</p>
+                <p className="truncate text-xs text-muted">{s.email}</p>
+              </div>
+              <Badge tone="muted">QR {s.qrFixedCode}</Badge>
+              {!s.isActive && <Badge tone="red">Inactivo</Badge>}
+              <span className="text-muted-dim">
+                <IconChevron />
+              </span>
+            </Card>
+          </Link>
+        ))}
+      </div>
+    </Shell>
   );
 }

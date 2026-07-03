@@ -24,6 +24,53 @@ public class CheckInService(IMamboDbContext db, IClock clock)
         return await RegisterAsync(student.Id, source, ct);
     }
 
+    /// <summary>Ventana en la que una sesión es "activa"/escaneable: [inicio, fin + 30min].</summary>
+    public static bool IsSessionScannable(DateTime startUtc, DateTime endUtc, DateTime nowUtc) =>
+        nowUtc >= startUtc && nowUtc <= endUtc + Mambo.Domain.Rules.AttendanceWindow.ClosesAfterEnd;
+
+    /// <summary>
+    /// Check-in sobre una sesión EXPLÍCITA (Modo B: el alumno escaneó el QR de esa clase).
+    /// Valida que la sesión esté activa, evita duplicados y crea una asistencia Pendiente.
+    /// </summary>
+    public async Task<CheckInResult> RegisterForSessionAsync(Guid studentId, Guid sessionId,
+        AttendanceSource source, CancellationToken ct = default)
+    {
+        var now = clock.UtcNow;
+
+        if (!await db.Students.AnyAsync(s => s.Id == studentId && s.IsActive, ct))
+            throw new InvalidOperationException("Alumno no encontrado o inactivo.");
+
+        var session = await db.Sessions.FirstOrDefaultAsync(s => s.Id == sessionId, ct)
+            ?? throw new InvalidOperationException("La clase no existe.");
+        if (session.Status == "cancelled")
+            throw new InvalidOperationException("La clase fue cancelada.");
+        if (!IsSessionScannable(session.StartAt, session.EndAt, now))
+            throw new InvalidOperationException("La clase no está activa en este momento.");
+
+        var existing = await db.Attendances
+            .FirstOrDefaultAsync(a => a.StudentId == studentId && a.ClassSessionId == sessionId, ct);
+        if (existing is not null)
+            return new CheckInResult(existing.Id, studentId, existing.Status, existing.IsAmbiguous,
+                false, true, "Ya habías marcado asistencia a esta clase.");
+
+        var attendance = new Attendance
+        {
+            Id = Guid.NewGuid(),
+            StudentId = studentId,
+            ClassSessionId = sessionId,
+            Status = AttendanceStatus.Pending,
+            Source = source,
+            CheckedInAt = now,
+            IsAmbiguous = false,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        db.Attendances.Add(attendance);
+        await db.SaveChangesAsync(ct);
+        return new CheckInResult(attendance.Id, studentId, attendance.Status, false, false, false,
+            "Asistencia registrada como pendiente.");
+    }
+
     /// <summary>Check-in por id de alumno.</summary>
     public async Task<CheckInResult> RegisterAsync(Guid studentId, AttendanceSource source, CancellationToken ct = default)
     {

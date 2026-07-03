@@ -8,9 +8,10 @@ Guía para Claude Code al trabajar en este proyecto. Léela antes de proponer ca
 profesores, clases, asistencia por QR, cuponeras, pagos y deudas. App web responsive, preparada
 para PWA/app nativa a futuro.
 
-**Estado actual: FASE DE DISEÑO. Todavía NO se escribe código de la aplicación.** Toda la carpeta
-es documentación de análisis. No crear proyectos de código (frontend/backend) hasta que el cliente
-lo apruebe explícitamente.
+**Estado actual: EN DESARROLLO.** Las tres capas existen y compilan/corren (ver `NOTAS_CAMBIOS.txt`).
+Backend .NET 8 en capas (12 tests verdes), frontend Next.js 14 con identidad de marca aplicada, y
+`db/` con el SQL de Supabase. El flujo de asistencia y la gestión de cuponeras/pagos funcionan E2E
+en local (modo SQLite). Antes de cambios grandes, leer la bitácora y dejar una entrada datada.
 
 ## Stack objetivo (cuando se implemente)
 
@@ -22,8 +23,13 @@ lo apruebe explícitamente.
   desarrollar/probar local antes de Supabase. Decisión [D15]. Roles de negocio en tablas propias.
   **A futuro:** integrar Supabase Auth (la validación por issuer es configurable). El diseño original
   (Supabase Auth) sigue documentado en `docs/03-...` como objetivo.
-- **Correr local:** ver `RUN_LOCAL.md` (Postgres en Docker + `dotnet run` + `npm run dev`).
-  Usuarios demo vía `POST /api/dev/seed`. EF Core usa convención **snake_case** ([D16]).
+- **Correr local:** ver `RUN_LOCAL.md`. Dos opciones de BD ([D17]): **SQLite sin
+  Docker** (modo por defecto en `appsettings.Development.json`,
+  `Database:Provider=Sqlite`; esquema por `EnsureCreated`) o **Postgres en Docker**
+  (`Database:Provider=Npgsql`, usa el SQL de `db/`). Backend `dotnet run` + frontend
+  `npm run dev`. Usuarios demo vía `POST /api/dev/seed`. EF Core usa **snake_case** ([D16]).
+  En SQLite los `HasPostgresEnum` se omiten (enums como int) y no corren vistas/triggers/RLS
+  de `db/`; el saldo/deuda los calcula el backend, así que el flujo funciona igual.
 - **No usar** Firebase ni NoSQL (la lógica es relacional). No implementar pasarela de pago.
 
 ## Estructura de la carpeta
@@ -32,11 +38,42 @@ lo apruebe explícitamente.
 README.md            Índice y resumen del proyecto.
 CLAUDE.md            Este archivo.
 NOTAS_CAMBIOS.txt    Bitácora de cambios/decisiones grandes (MANTENER ACTUALIZADA).
-docs/
-  01-ANALISIS-Y-ARQUITECTURA.md   Dominio, arquitectura, flujos, casos borde, mejoras.
-  02-ESQUEMA-BD.md                Tablas, PK/FK, índices, vistas, RLS, reglas transaccionales.
-  03-SUPABASE-STORAGE-Y-AUTH.md   Fotos en Storage + decisión de auth.
+Referencias/         Identidad de marca del cliente (flyers, horarios, colores).
+docs/                Documentación de análisis (01 arquitectura, 02 BD, 03 storage/auth).
+db/                  Migraciones SQL para Supabase (esquema, RLS, vistas, seed).
+backend/             .NET 8 en capas (Domain → Application → Infrastructure → Api).
+frontend/            Next.js 14 (App Router) con el sistema de diseño de marca.
 ```
+
+## Identidad de marca (aplicada en el frontend)
+
+Fuente: `Referencias/` (flyers del cliente). Es OBLIGATORIO respetarla en cualquier UI nueva.
+- **Colores:** NEGRO (`ink`, base `#0B0B0C`) + VERDE LIMA NEÓN (`lime` `#C4F82B`). Tema oscuro.
+- **Tipografías:** `Anton` (display, estilo póster) + `Inter` (cuerpo).
+- **Slogan:** "BAILÁ · CONECTÁ · DISFRUTÁ". **Datos:** Pablo de María 1474 esq. Brandzen · 092 136 401.
+- **Sistema de diseño en `frontend/src/components/ui/`** (Logo, Icons SVG inline, Toast, Button,
+  Card, Stat, Avatar, Badge, Skeleton, Field, TopBar/Shell/PageHeader) + `components/format.tsx`
+  (etiquetas ES, fechas UY, StatusBadge/PassBadge). Reutilizar SIEMPRE estos componentes; no
+  reintroducir estilos claros tipo slate/blanco.
+
+## Endpoints principales del API (.NET)
+
+- Auth: `POST /api/auth/login`. Dev: `POST /api/dev/seed`, `POST /api/dev/seed-horarios`.
+- Público (sin auth): `GET /api/public/schedule` (grilla de clases activas para /horarios).
+- Check-in: `POST /api/checkin/qr` (Modo A: recepción escanea al alumno). Sesiones:
+  `GET /api/sessions/today`, `.../{id}/attendances`, `POST /api/sessions/ensure-today`
+  (genera las sesiones de la grilla de hoy; TeacherOrAdmin).
+- Modo B (QR dinámico por clase): `GET /api/display/active` (pantalla academia, con token
+  rotativo; TeacherOrAdmin) y el alumno `GET /api/me/qr`, `GET /api/me/active-classes`,
+  `POST /api/me/scan` (valida token y marca asistencia pendiente).
+- Asistencia: `POST /api/attendance/{id}/confirm|reject|correct`, `.../confirm-many`.
+- Alumno: `GET /api/me/panel`. Resumen: `GET /api/students/{id}/summary`.
+- Admin: `students`, `teachers`, `classes` (alta+listado), `PUT students|teachers|classes/{id}` y
+  `.../{id}/active` (editar/baja lógica de alumnos, profesores y clases), `students/{id}` (ficha),
+  `passtypes`, `passes` (asignar), `passes/{id}/extend`, `payments`, `payments/pending`,
+  `payments/{id}/confirm|cancel`, `debtors`, `alerts` (avisos: alumnos en riesgo +
+  pendientes antiguas), `attendance/manual`. Profe/admin: `GET /api/sessions/pending-old`.
+  Avisos del alumno: viajan dentro de `GET /api/me/panel` (campo `alerts`).
 
 ## Decisiones de negocio CONFIRMADAS (no re-litigar sin avisar)
 

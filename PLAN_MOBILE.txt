@@ -1,0 +1,257 @@
+==========================================================================
+ PLAN DE ACCIÓN — App MÓVIL nativa (Android + iOS)
+ APP Montevideo MAMBO — Academia de Baile
+ Fecha: 2026-07-02
+==========================================================================
+
+Objetivo del cliente:
+  Que ALUMNOS y PROFESORES usen la plataforma desde el celular y la tablet,
+  con apps NATIVAS Android e iOS (no solo web). Recepción/administración
+  puede seguir en pantalla grande (web).
+
+
+--------------------------------------------------------------------------
+0) ACLARACIÓN CLAVE (lo primero que hay que entender)
+--------------------------------------------------------------------------
+"Volverse móvil" NO significa perder ni rehacer el backend. Al revés:
+
+  - El BACKEND (.NET 8 Web API) es el CEREBRO compartido. Guarda las reglas
+    de negocio, la base de datos y la seguridad. Se REUTILIZA tal cual.
+  - El FRONTEND web (Next.js) es UNA de las "caras" (clientes) del sistema.
+  - La app MÓVIL nativa es OTRA "cara" que habla con EL MISMO backend por
+    HTTP/JSON (la misma API que ya usa la web).
+
+  Esquema:
+
+        [ App Alumno (iOS/Android) ] --\
+        [ App Profe  (iOS/Android) ] ----\
+                                          >---> [ .NET 8 API ] ---> [ Supabase / PostgreSQL ]
+        [ Web Admin/Recepción       ] ---/        (el cerebro)          (datos + storage)
+        [ Web pública (horarios)     ] --/
+
+  => La decisión NO es "web o móvil": es AGREGAR clientes nativos que
+     consumen la API existente. El backend queda como está (con ajustes
+     menores de infraestructura, ver §4).
+
+  ¿"Cosas separadas"? SÍ, ya lo están y así debe seguir:
+     * Repo/servicio BACKEND (API + BD)      = 1 cosa (compartida por todos)
+     * Cliente WEB (Next.js)                 = 1 cosa
+     * Cliente MÓVIL (nativo)                = 1 cosa nueva
+  Se comunican solo por la API. Cada uno se despliega por su lado.
+
+
+--------------------------------------------------------------------------
+1) REPARTO POR AUDIENCIA (quién usa qué)
+--------------------------------------------------------------------------
+No todos necesitan lo mismo. Propuesta:
+
+  ALUMNO  -> APP NATIVA (celular). Foco: su QR, saldo, cuponeras, historial,
+             deudas, horarios y avisos. Uso frecuente, en movimiento.
+
+  PROFE   -> APP NATIVA (tablet/celular). Foco: clases de hoy, lista de
+             asistencia, confirmar/corregir. La tablet es ideal para tomar
+             lista en el salón.
+
+  RECEPCIÓN / ADMIN -> WEB (o tablet con la web). Foco: alta de alumnos,
+             cuponeras, pagos, morosos, check-in por QR. Es carga de datos:
+             se hace mejor en pantalla grande + teclado. NO es urgente
+             llevarlo a nativo (puede quedar web/PWA).
+
+  Regla práctica: "lo que se usa parado y en movimiento -> nativo;
+  lo que se usa sentado cargando datos -> web".
+
+
+--------------------------------------------------------------------------
+2) DECISIÓN TÉCNICA: ¿con qué se hace la app nativa?
+--------------------------------------------------------------------------
+Opciones evaluadas (de más recomendada a menos):
+
+  [A] REACT NATIVE + EXPO   <== RECOMENDADA
+      + Un solo código -> apps NATIVAS reales para iOS y Android.
+      + Es React + TypeScript: se REUTILIZA el conocimiento y el patrón del
+        cliente de API que ya existe en la web (lib/api.ts casi calca).
+      + Cámara/QR, push notifications, biometría, tiendas: todo cubierto.
+      + Expo simplifica builds, actualizaciones OTA y publicación.
+      - Casos muy avanzados de hardware pueden requerir módulos nativos
+        (no es el caso de esta app).
+
+  [B] FLUTTER
+      + Apps nativas, excelente performance y UI muy pulida.
+      - Lenguaje nuevo para el equipo (Dart); no reutiliza el código React.
+
+  [C] PWA (la web actual, "instalable")
+      + Ya estamos 80% ahí: la web es responsive y PWA-ready.
+      + Rapidísimo y barato: sirve para validar la experiencia móvil YA.
+      - NO es "nativo" real: iOS limita push/instalación; no va a las tiendas
+        de forma natural. Sirve como PASO INTERMEDIO, no como meta final.
+
+  [D] NATIVO SEPARADO (Swift para iOS + Kotlin para Android)
+      - Dos códigos, dos equipos, el doble de costo y tiempo. Sobra para
+        esta app. Descartado.
+
+  RECOMENDACIÓN:
+    Meta = React Native + Expo (una app, iOS + Android nativos).
+    Estrategia de bajo riesgo = arrancar por una PWA (paso 0) para validar
+    UX móvil rápido, y en paralelo/enseguida construir la app en Expo.
+
+
+--------------------------------------------------------------------------
+3) ALCANCE FUNCIONAL de la app nativa (MVP -> completo)
+--------------------------------------------------------------------------
+  APP ALUMNO (MVP):
+    - Login (persistente, sin re-loguear cada vez).
+    - "Mi QR" en pantalla (para que recepción lo escanee).
+    - Saldo / cuponeras / vencimientos.
+    - Historial de asistencias y estado de deuda.
+    - Horarios 2026.
+    - (Fase 2) Avisos push: vencimiento próximo, deuda, cambios de clase.
+
+  APP PROFE (MVP):
+    - Login persistente.
+    - Clases de hoy.
+    - Lista de asistencia: confirmar / corregir / rechazar (con foto+nombre).
+    - (Fase 2) Escanear el QR del alumno desde la app (check-in en el salón).
+    - (Fase 2) Avisos push de pendientes por confirmar.
+
+  RECEPCIÓN/ADMIN:
+    - Se mantiene en web (ya está hecho). Opcional: PWA instalable en tablet.
+
+
+--------------------------------------------------------------------------
+4) CAMBIOS NECESARIOS EN EL BACKEND (menores, pero obligatorios)
+--------------------------------------------------------------------------
+El backend se reutiliza, pero para soportar apps móviles reales hay que:
+
+  [4.1] DESPLEGARLO EN LA NUBE (hoy corre en localhost).
+        - Hosting del API .NET con HTTPS público (ej. Azure App Service,
+          Railway, Render o Fly.io).
+        - Base de datos: Supabase (PostgreSQL) real (dejar el modo SQLite
+          solo para desarrollo local).
+        - Las apps móviles NO pueden hablar con "localhost"; necesitan una
+          URL pública estable (ej. api.montevideomambo.uy).
+
+  [4.2] AUTENTICACIÓN pensada para móvil.
+        - Hoy hay JWT propio (12 h). En móvil el usuario NO quiere re-loguear:
+          agregar REFRESH TOKENS (sesión larga y segura) o migrar a Supabase
+          Auth (que ya trae refresh y login social si se quisiera).
+        - Guardar el token en almacenamiento seguro del dispositivo
+          (Keychain/Keystore), no en texto plano.
+
+  [4.3] PUSH NOTIFICATIONS (para avisos).
+        - Integrar Expo Push / Firebase Cloud Messaging (Android) + APNs (iOS).
+        - Endpoint para registrar el "device token" de cada usuario.
+        - (Requiere una tabla nueva device_token + un servicio de envío.)
+
+  [4.4] VERSIONADO Y RESILIENCIA de la API.
+        - Prefijo de versión (ej. /api/v1) para poder evolucionar sin romper
+          apps ya instaladas (el usuario no siempre actualiza).
+        - Mensajes de error claros y consistentes (ya casi está).
+
+  [4.5] QR del alumno.
+        - Confirmar el modo primario (hoy: recepción escanea al alumno).
+        - Para móvil conviene que la app del alumno MUESTRE su QR (a partir
+          de su código fijo) o, si se elige Modo B, tokens QR dinámicos
+          (la entidad QrToken ya existe en el modelo, falta usarla).
+
+  [4.6] CORS deja de importar para las apps nativas (no tienen CORS), pero
+        la web sigue necesitándolo. Sin cambios ahí, solo tenerlo presente.
+
+
+--------------------------------------------------------------------------
+5) INFRAESTRUCTURA, CUENTAS Y COSTOS a prever
+--------------------------------------------------------------------------
+  - Apple Developer Program: USD 99/año (obligatorio para publicar en iOS).
+  - Google Play Console: USD 25 (pago único).
+  - Hosting del API + Supabase: hay planes gratuitos/baratos para empezar;
+    escalan con el uso.
+  - Cuenta Expo (EAS Build): plan gratis para empezar; pago si se necesitan
+    más builds/velocidad.
+  - Dominio propio (ej. montevideomambo.uy) para la API y la web.
+  - Assets de marca: ícono de app, splash screen, capturas para las tiendas
+    (usar la identidad de /Referencias: negro + verde lima + logo del anillo).
+
+
+--------------------------------------------------------------------------
+6) FASES DEL PLAN (ordenadas, con entregables)
+--------------------------------------------------------------------------
+  FASE 0 — Validación rápida en móvil (PWA)         [entregable: web instalable]
+    - Generar íconos PWA + service worker.
+    - Ajustar la web para que se "instale" en el celular y probar la UX real
+      con alumnos/profes. Sirve para decidir detalles antes de invertir en nativo.
+
+  FASE 1 — Preparar el backend para producción/móvil  [entregable: API pública]
+    - Desplegar API + Supabase con HTTPS.
+    - Refresh tokens (o Supabase Auth) + almacenamiento seguro.
+    - Versionado /api/v1. Endpoint de device_token (para push más adelante).
+
+  FASE 2 — App móvil: esqueleto + auth               [entregable: app que loguea]
+    - Proyecto Expo (React Native + TypeScript).
+    - Reusar el patrón de lib/api.ts. Login persistente. Navegación por rol.
+    - Publicar builds internas de prueba (TestFlight / Play Internal Testing).
+
+  FASE 3 — App ALUMNO (MVP)                          [entregable: app alumno usable]
+    - Mi QR, saldo, cuponeras, historial, deudas, horarios.
+
+  FASE 4 — App PROFE (MVP)                           [entregable: app profe usable]
+    - Clases de hoy, lista de asistencia, confirmar/corregir/rechazar.
+
+  FASE 5 — Nativo pleno                              [entregable: apps en las tiendas]
+    - Push notifications (vencimientos, deuda, pendientes).
+    - Escaneo de QR desde la app del profe (check-in en el salón).
+    - Pulido visual, ícono/splash, capturas, publicación en App Store y Play.
+
+  FASE 6 — Iteración                                 [entregable: mejoras continuas]
+    - Fotos de alumnos (Supabase Storage), reportes, biometría, offline, etc.
+
+
+--------------------------------------------------------------------------
+7) ESTIMACIÓN APROXIMADA de esfuerzo (orientativa)
+--------------------------------------------------------------------------
+  (Depende del equipo; asumiendo 1-2 devs con base React/.NET ya hecha.)
+    - Fase 0 (PWA):                 ~ pocos días.
+    - Fase 1 (backend prod/móvil):  ~ 1-2 semanas.
+    - Fase 2 (esqueleto + auth):    ~ 1 semana.
+    - Fase 3 (app alumno MVP):      ~ 1-2 semanas.
+    - Fase 4 (app profe MVP):       ~ 1-2 semanas.
+    - Fase 5 (push + QR + tiendas): ~ 2-3 semanas (incluye revisión de Apple).
+  Total MVP nativo en tiendas: aprox. 6-10 semanas de trabajo efectivo.
+  El proceso de REVISIÓN de Apple/Google agrega días de espera por publicación.
+
+
+--------------------------------------------------------------------------
+8) RIESGOS Y DECISIONES A CONFIRMAR CON EL CLIENTE
+--------------------------------------------------------------------------
+  [ ] ¿Meta = nativo en tiendas (Expo) o alcanza con PWA instalable?
+      (Cambia costo, tiempo y necesidad de cuentas de desarrollador.)
+  [ ] ¿Recepción/Admin se queda en web, o también quieren app? (Recomendado: web.)
+  [ ] Modo de QR definitivo: alumno muestra su QR (Modo A) vs. tokens dinámicos
+      (Modo B). Afecta seguridad y qué se construye en la app.
+  [ ] ¿Quién paga/gestiona las cuentas Apple/Google y el hosting?
+  [ ] Nombre e identidad en tiendas (dominio, ícono, textos).
+  [ ] Volumen esperado (alumnos activos) para dimensionar hosting/Supabase.
+  [ ] Conectividad en el salón (wifi/datos) -> ¿necesitamos modo offline?
+
+  Riesgos técnicos principales:
+    - Publicación en Apple (revisión estricta, requiere cuenta y a veces
+      correcciones). Planificar con margen.
+    - Auth de larga duración en móvil (hacerlo seguro con refresh tokens).
+    - Mantener 3 clientes (web + 2 apps) sincronizados con la API: mitigado
+      porque todos consumen contratos claros del mismo backend versionado.
+
+
+--------------------------------------------------------------------------
+9) PRÓXIMOS PASOS INMEDIATOS (para arrancar sin fricción)
+--------------------------------------------------------------------------
+  1. Confirmar §8 (sobre todo: nativo/Expo vs PWA, y quién administra cuentas).
+  2. Elegir hosting del API + activar Supabase real (Fase 1).
+  3. Generar íconos/splash de marca (sirven para PWA y para la app).
+  4. Definir el contrato de auth para móvil (refresh tokens).
+  5. Crear el proyecto Expo y portar el login + "Mi panel" del alumno como
+     primera prueba nativa (reusando lib/api.ts).
+
+RESUMEN EN UNA FRASE:
+  No se rehace el backend: se PUBLICA en la nube y se le agregan clientes
+  nativos (Expo/React Native) para alumno y profe, dejando la web para
+  administración/recepción.
+
+==========================================================================

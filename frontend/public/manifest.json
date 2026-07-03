@@ -1,11 +1,11 @@
 {
-  "name": "Academia de Baile — Montevideo MAMBO",
+  "name": "Montevideo MAMBO — Gestión de la academia",
   "short_name": "MAMBO",
-  "description": "Gestión de clases, asistencias por QR, cuponeras y pagos.",
+  "description": "Bailá, conectá, disfrutá. Clases, asistencias por QR, cuponeras y pagos.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f8fafc",
-  "theme_color": "#0f172a",
+  "background_color": "#0b0b0c",
+  "theme_color": "#0b0b0c",
   "icons": [
     {
       "src": "/icon-192.png",

@@ -13,8 +13,20 @@ namespace Mambo.Api.Controllers;
 public class SessionsController(
     IMamboDbContext db,
     StudentSummaryService summaries,
+    AdminService admin,
+    AlertsService alerts,
     IClock clock) : ControllerBase
 {
+    /// <summary>Genera (idempotente) las sesiones de hoy para las clases activas del día.</summary>
+    [HttpPost("ensure-today")]
+    public async Task<IActionResult> EnsureToday(CancellationToken ct) =>
+        Ok(new { count = await admin.EnsureTodaySessionsAsync(ct) });
+
+    /// <summary>Asistencias pendientes de clases ya finalizadas (recordatorio al profe).</summary>
+    [HttpGet("pending-old")]
+    public async Task<IActionResult> PendingOld(CancellationToken ct) =>
+        Ok(await alerts.ListOldPendingAsync(ct));
+
     /// <summary>Sesiones de hoy con su conteo de pendientes (para que el profesor elija la clase).</summary>
     [HttpGet("today")]
     public async Task<IActionResult> Today(CancellationToken ct)

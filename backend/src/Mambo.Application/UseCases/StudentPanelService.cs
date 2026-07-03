@@ -8,10 +8,11 @@ public record PassDto(Guid Id, string Kind, int Balance, int? InitialCount,
 public record AttendanceHistoryDto(Guid Id, DateOnly Date, string ClassName, string Status, string Source, bool CoveredByUnlimited);
 public record PaymentDto(Guid Id, decimal Amount, string Method, string Status, DateOnly? PaidAt, string? Concept);
 public record StudentPanel(StudentSummary Summary, IReadOnlyList<PassDto> Passes,
-    IReadOnlyList<AttendanceHistoryDto> History, IReadOnlyList<PaymentDto> Payments);
+    IReadOnlyList<AttendanceHistoryDto> History, IReadOnlyList<PaymentDto> Payments,
+    IReadOnlyList<AlertDto> Alerts);
 
-/// <summary>Arma el panel del alumno: saldo, cuponeras, historial de asistencias y pagos.</summary>
-public class StudentPanelService(IMamboDbContext db, StudentSummaryService summaries)
+/// <summary>Arma el panel del alumno: saldo, cuponeras, historial de asistencias, pagos y avisos.</summary>
+public class StudentPanelService(IMamboDbContext db, StudentSummaryService summaries, IClock clock)
 {
     public async Task<StudentPanel?> GetAsync(Guid studentId, CancellationToken ct = default)
     {
@@ -39,6 +40,15 @@ public class StudentPanelService(IMamboDbContext db, StudentSummaryService summa
             .Select(p => new PaymentDto(p.Id, p.Amount, p.Method, p.Status.ToString(), p.PaidAt, p.Concept))
             .ToListAsync(ct);
 
-        return new StudentPanel(summary, passes, history, payments);
+        // Avisos/recordatorios: cuponeras por vencer, última clase y deuda.
+        var today = DateOnly.FromDateTime(clock.UtcNow);
+        var alerts = passes
+            .SelectMany(p => PassAlerts.ForPass(p.Id, p.Kind, p.Balance, p.ValidTo, p.Status, today))
+            .ToList();
+        if (summary.DebtClasses > 0)
+            alerts.Insert(0, new AlertDto("critical",
+                $"Tenés {summary.DebtClasses} clase(s) en deuda", null));
+
+        return new StudentPanel(summary, passes, history, payments, alerts);
     }
 }

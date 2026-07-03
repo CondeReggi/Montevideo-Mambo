@@ -19,4 +19,14 @@ public class DevController(DevSeeder seeder, IWebHostEnvironment env) : Controll
         var message = await seeder.SeedAsync(ct);
         return Ok(new { message });
     }
+
+    /// <summary>Carga la grilla real de clases 2026 (ver /Referencias/horarios.webp).</summary>
+    [HttpPost("seed-horarios")]
+    public async Task<IActionResult> SeedHorarios(CancellationToken ct)
+    {
+        if (!env.IsDevelopment())
+            return NotFound();
+        var message = await seeder.SeedHorarios2026Async(ct);
+        return Ok(new { message });
+    }
 }

@@ -1,42 +1,34 @@
 import { StudentSummary } from "@/lib/api";
+import { Avatar, Badge } from "@/components/ui";
 
 /** Tarjeta de verificación visual del alumno: foto + nombre + saldo. */
-export default function StudentCard({ student }: { student: StudentSummary | null }) {
+export default function StudentCard({
+  student,
+  size = "md",
+}: {
+  student: StudentSummary | null;
+  size?: "md" | "lg";
+}) {
   if (!student) return null;
-
-  const initials = student.fullName
-    .split(" ")
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
 
   return (
     <div className="flex items-center gap-4">
-      {student.photoUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={student.photoUrl}
-          alt={student.fullName}
-          className="w-16 h-16 rounded-full object-cover border"
-        />
-      ) : (
-        <div className="w-16 h-16 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-semibold text-lg">
-          {initials}
-        </div>
-      )}
-      <div className="flex-1">
-        <p className="font-semibold text-lg leading-tight">{student.fullName}</p>
-        <div className="text-sm mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+      <Avatar name={student.fullName} photoUrl={student.photoUrl} size={size === "lg" ? "lg" : "md"} ring />
+      <div className="min-w-0 flex-1">
+        <p className={`truncate font-semibold ${size === "lg" ? "text-xl" : "text-lg"} leading-tight`}>
+          {student.fullName}
+        </p>
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           {student.hasActiveUnlimited ? (
-            <span className="text-emerald-700 font-medium">Pase libre vigente</span>
+            <Badge tone="lime">Pase libre vigente</Badge>
           ) : (
-            <span className={student.classesRemaining > 0 ? "text-slate-700" : "text-amber-700"}>
-              {student.classesRemaining} clase(s) restante(s)
-            </span>
+            <Badge tone={student.classesRemaining > 0 ? "lime" : "muted"}>
+              {student.classesRemaining} clase{student.classesRemaining === 1 ? "" : "s"}
+            </Badge>
           )}
-          {student.debtClasses > 0 && (
-            <span className="text-red-700 font-medium">Debe {student.debtClasses}</span>
+          {student.debtClasses > 0 && <Badge tone="red">Debe {student.debtClasses}</Badge>}
+          {student.pendingAttendances > 0 && (
+            <Badge tone="amber">{student.pendingAttendances} pendiente(s)</Badge>
           )}
         </div>
       </div>

@@ -11,16 +11,21 @@ de baile: alumnos, profesores, clases, asistencias por QR, cuponeras, pagos y de
 - **Auth:** Supabase Auth + validación de JWT en .NET.
 
 ## Estado actual
-🟢 **En desarrollo.** Las tres capas existen y compilan:
+🟢 **En desarrollo.** Las tres capas existen, compilan y corren en local:
 - `db/` — migraciones SQL para Supabase (esquema, índices, RLS, vistas, seed).
 - `backend/` — .NET 8 en capas, con reglas de asistencia/cuponeras y **12 tests en verde**.
-- `frontend/` — Next.js 14 con la pantalla de check-in de recepción.
+- `frontend/` — Next.js 14 con **identidad de marca aplicada** (negro + verde lima neón, ver
+  `Referencias/`): landing, login, horarios 2026, check-in, panel del profesor, panel del alumno
+  y panel de administración completo.
 
-**Funcionalidad lista (a nivel código):** login por rol, alta de alumnos/profesores/clases,
-check-in por QR con verificación visual, panel del profesor (confirmar/corregir) y panel del alumno.
+**Funcionalidad lista:** login por rol, alta de alumnos/profesores/clases, check-in por QR con
+verificación visual, panel del profesor (confirmar/corregir/rechazar), panel del alumno, y
+**gestión admin**: venta y extensión de cuponeras, pagos manuales, morosos, ficha del alumno y
+asistencia manual. Grilla de horarios 2026 sembrable con un clic.
 
-➡️ **Para correr todo local en minutos: ver [`RUN_LOCAL.md`](RUN_LOCAL.md)** (Postgres en Docker +
-backend + frontend, con datos demo y usuarios de prueba).
+➡️ **Para correr todo local en minutos: ver [`RUN_LOCAL.md`](RUN_LOCAL.md).** Dos opciones:
+**SQLite sin Docker** (por defecto, ideal para ver la app rápido) o **Postgres en Docker**
+(fiel a producción). En ambas, `dotnet run` + `npm run dev` con datos demo y usuarios de prueba.
 
 Ver `NOTAS_CAMBIOS.txt` para el detalle de avances y `backend/README.md` / `frontend/README.md`
 para correr cada parte.

@@ -1,0 +1,9 @@
+# No mandar artefactos locales al contexto de build
+**/bin/
+**/obj/
+**/*.db
+**/*.db-shm
+**/*.db-wal
+**/.vs/
+**/*.user
+tests/

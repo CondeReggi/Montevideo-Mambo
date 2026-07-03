@@ -2,29 +2,39 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { login, seedDemo, ApiError } from "@/lib/api";
 import { setSession } from "@/lib/auth";
+import { LogoMark } from "@/components/ui/Logo";
+import { Button, Field } from "@/components/ui";
+import { useToast } from "@/components/ui/Toast";
+import { IconSpark, IconArrowLeft } from "@/components/ui/Icons";
+
+const DEMO = [
+  { label: "Admin", email: "admin@mambo.local", pass: "Admin1234!" },
+  { label: "Profesor", email: "profe@mambo.local", pass: "Profe1234!" },
+  { label: "Alumna", email: "ana@mambo.local", pass: "Alumno1234!" },
+];
 
 export default function LoginPage() {
   const router = useRouter();
+  const toast = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
+    if (!email || !password) return;
     setBusy(true);
-    setError(null);
     try {
       const res = await login(email, password);
       setSession({ ...res });
-      // Redirección por rol.
+      toast.success(`¡Bienvenido, ${res.fullName.split(" ")[0]}!`);
       if (res.roles.includes("admin")) router.push("/admin");
       else if (res.roles.includes("teacher")) router.push("/teacher");
       else router.push("/me");
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "No se pudo iniciar sesión.");
+      toast.error(e instanceof ApiError ? e.message : "No se pudo iniciar sesión.");
     } finally {
       setBusy(false);
     }
@@ -32,58 +42,75 @@ export default function LoginPage() {
 
   const seed = async () => {
     setBusy(true);
-    setError(null);
     try {
       const r = await seedDemo();
-      setInfo(r.message);
+      toast.success(r.message);
     } catch {
-      setError("No se pudo cargar datos demo (¿backend corriendo en modo Development?).");
+      toast.error("No se pudo cargar datos demo (¿backend en modo Development?).");
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900 flex items-center justify-center p-6">
-      <div className="w-full max-w-sm bg-white rounded-xl shadow p-6">
-        <h1 className="text-2xl font-bold mb-1">Ingresar</h1>
-        <p className="text-sm text-slate-500 mb-5">Academia de Baile — Montevideo MAMBO</p>
+    <main className="relative flex min-h-screen items-center justify-center bg-hero-grad px-5 py-10">
+      <Link
+        href="/"
+        className="absolute left-5 top-5 inline-flex items-center gap-1.5 text-sm text-muted transition hover:text-foreground"
+      >
+        <IconArrowLeft /> Inicio
+      </Link>
 
-        <label className="text-sm text-slate-600">Email</label>
-        <input
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="w-full border rounded-lg px-3 py-2 mb-3 mt-1"
-          placeholder="admin@mambo.local"
-        />
-        <label className="text-sm text-slate-600">Contraseña</label>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && submit()}
-          className="w-full border rounded-lg px-3 py-2 mb-4 mt-1"
-          placeholder="••••••••"
-        />
+      <div className="w-full max-w-sm animate-fade-up">
+        <div className="mb-6 flex flex-col items-center text-center">
+          <LogoMark className="h-14 w-14 drop-shadow-[0_0_24px_rgba(196,248,43,0.5)]" />
+          <h1 className="mt-4 font-display text-2xl tracking-wide">Ingresá a MAMBO</h1>
+          <p className="mt-1 text-sm text-muted">Gestión de la academia de baile</p>
+        </div>
 
-        {error && <p className="text-red-600 text-sm mb-3">{error}</p>}
-        {info && <p className="text-emerald-700 text-sm mb-3">{info}</p>}
+        <div className="card space-y-4 p-6">
+          <Field label="Email" value={email} onChange={setEmail} placeholder="admin@mambo.local" type="email" />
+          <div>
+            <Field
+              label="Contraseña"
+              value={password}
+              onChange={setPassword}
+              placeholder="••••••••"
+              type="password"
+              onKeyDown={(e) => e.key === "Enter" && submit()}
+            />
+          </div>
+          <Button onClick={submit} loading={busy} disabled={!email || !password} className="w-full" icon={<IconSpark />}>
+            Ingresar
+          </Button>
 
-        <button
-          onClick={submit}
-          disabled={busy || !email || !password}
-          className="w-full rounded-lg bg-slate-900 text-white py-2 font-medium disabled:opacity-50"
-        >
-          Ingresar
-        </button>
-
-        <button
-          onClick={seed}
-          disabled={busy}
-          className="w-full rounded-lg border mt-2 py-2 text-sm text-slate-600 disabled:opacity-50"
-        >
-          Cargar datos demo (desarrollo)
-        </button>
+          <div className="border-t border-ink-500/60 pt-4">
+            <p className="mb-2 text-center text-xs uppercase tracking-wide text-muted-dim">
+              Acceso rápido (demo)
+            </p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {DEMO.map((d) => (
+                <button
+                  key={d.email}
+                  onClick={() => {
+                    setEmail(d.email);
+                    setPassword(d.pass);
+                  }}
+                  className="chip-muted transition hover:bg-ink-500"
+                >
+                  {d.label}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={seed}
+              disabled={busy}
+              className="mt-3 w-full text-center text-xs text-muted transition hover:text-lime disabled:opacity-50"
+            >
+              Cargar datos demo
+            </button>
+          </div>
+        </div>
       </div>
     </main>
   );

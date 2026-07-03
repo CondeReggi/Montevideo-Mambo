@@ -1,0 +1,27 @@
+# Blueprint de Render para el backend (.NET 8, Docker).
+# Al conectar el repo en Render (New + → Blueprint), toma este archivo.
+# Los valores marcados sync:false se cargan a mano en el panel (son secretos).
+services:
+  - type: web
+    name: mambo-api
+    runtime: docker
+    plan: free
+    region: virginia            # us-east, cerca de Uruguay (opciones: virginia, ohio, oregon, frankfurt)
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: Database__Provider
+        value: Npgsql
+      # Secretos: cargar en el panel de Render (Environment).
+      - key: ConnectionStrings__Supabase
+        sync: false             # Host=db.<ref>.supabase.co;Port=5432;Database=postgres;Username=postgres;Password=***;SSL Mode=Require;Trust Server Certificate=true
+      - key: Jwt__Key
+        sync: false             # clave larga y aleatoria (32+ chars)
+      - key: Qr__Secret
+        sync: false             # otra clave larga y aleatoria (para el QR dinámico)
+      - key: Cors__Origins
+        sync: false             # https://<tu-front>.vercel.app  (varios separados por ;)

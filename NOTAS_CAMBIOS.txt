@@ -5,36 +5,74 @@
 
 ##########################################################################
 #  PENDIENTES (checklist vivo — marcar con [x] al completar)             #
-#  Última actualización: 2026-06-28                                      #
+#  Última actualización: 2026-07-03 (backlog de mejoras/potenciales)        #
 ##########################################################################
 
 --- PARA CORRER / VALIDAR ------------------------------------------------
-[ ] Levantar Docker Desktop (manual) y `docker compose up -d`.
-[ ] Correr el flujo E2E con datos demo (login admin/profe/alumno, check-in,
-    confirmar, ver panel del alumno). Guía en RUN_LOCAL.md.
+[x] Correr el stack local SIN Docker (Postgres no disponible headless) →
+    se agregó modo SQLite de desarrollo. Backend en :5080, front en :3000.
+    (2026-07-02) Ver entrada de bitácora del 2026-07-02.
+[x] Validar el flujo E2E con datos demo: login admin/profe/alumno OK,
+    /api/dev/seed OK, sesiones de hoy con pendientes, panel del alumno con
+    saldo/pagos, check-in por QR devuelve tarjeta de verificación. (2026-07-02)
+[ ] (Opcional) Levantar Docker Desktop (manual) y `docker compose up -d`
+    para validar contra PostgreSQL real cuando WSL/Docker esté disponible.
+
+--- DISEÑO / MARCA -------------------------------------------------------
+[x] Rediseño profesional con la identidad MAMBO (negro + verde lima neón,
+    ver /Referencias). Sistema de diseño, componentes UI, todas las páginas
+    reconstruidas. (2026-07-02) Ver entrada [E12].
+[x] Página pública de Horarios 2026 (/horarios) con la grilla de la marca.
+[x] Grilla real de clases 2026 sembrada en la BD (POST /api/dev/seed-horarios).
+[x] Íconos PWA reales (public/icon-192.png, icon-512.png) + service worker —
+    íconos de marca generados (negro + bailarín lima), sw.js (network-first,
+    mismo origen) + registro en producción. (2026-07-03) Ver [E26].
+[x] Endpoint público de la grilla para que /horarios lea de la BD —
+    GET /api/public/schedule (anónimo) + /horarios lo consume con fallback a
+    la grilla fija de marca. (2026-07-03) Ver [E26].
 
 --- BACKEND / FUNCIONALIDAD ----------------------------------------------
-[ ] Pagos desde el panel admin (registrar/confirmar/cancelar) — hoy solo
-    se crean por el seeder demo. Falta endpoint + UI.
-[ ] Compra de cuponeras desde admin (crear Pass + crédito en ledger al
-    confirmar el pago). Hoy solo por seeder.
-[ ] Gestión de deudas / ver morosos (admin).
-[ ] Extender vencimiento de cuponeras (admin) — endpoint + UI (la regla R9
-    y el ledger 'extension' ya están diseñados).
-[ ] Registrar asistencia manual por el admin (sin check-in previo) — UI.
+[x] Pagos desde el panel admin (registrar) — POST /api/admin/payments + UI
+    en /admin/payments y en la ficha del alumno. (2026-07-02)
+[x] Compra de cuponeras desde admin (Pass + crédito en ledger + pago) —
+    POST /api/admin/passes + UI /admin/passes y ficha. (2026-07-02)
+[x] Gestión de deudas / ver morosos — GET /api/admin/debtors + UI. (2026-07-02)
+[x] Extender vencimiento/clases de cuponeras — POST /api/admin/passes/{id}/
+    extend + UI en la ficha del alumno. (2026-07-02)
+[x] Registrar asistencia manual por el admin — POST /api/admin/attendance/
+    manual + botón en la ficha del alumno. (2026-07-02)
+[x] Confirmar/cancelar PAGOS pendientes — POST /api/admin/payments/{id}/
+    confirm | cancel + GET /api/admin/payments/pending + UI en /admin/payments
+    (checkbox "confirmado" al registrar + lista de pendientes con acciones). (2026-07-03)
+[x] Editar / desactivar alumnos y clases — PUT /api/admin/students/{id} y
+    /classes/{id} + POST .../active. UI: edición y baja/alta en la ficha del
+    alumno y en /admin/classes. (2026-07-03)
+[x] Generar sesiones automáticamente para la grilla del día — POST /api/
+    sessions/ensure-today (TeacherOrAdmin, idempotente por día). Botón
+    "Generar clases de hoy" en el panel del profesor y en el dashboard. (2026-07-03)
+[x] Imprimir/mostrar el QR del alumno a partir de su código fijo — componente
+    StudentQr (lib qrcode, offline) en la ficha, con impresión de carnet. (2026-07-03)
 [ ] Subida de FOTOS de alumnos a Supabase Storage (alta con foto + URL
     firmada). Hoy en local se muestran las iniciales.
-[ ] Tokens QR DINÁMICOS (Modo B: el alumno escanea el QR de la academia).
-[ ] Panel de "pendientes antiguas" + recordatorios al profesor (vista
-    attendance_pending_old ya existe).
-[ ] Ajustar la vista SQL student_balance para contar también asistencias
-    confirmadas NO cubiertas como deuda (D12). Hoy lo calcula el backend
-    (StudentSummaryService) pero la vista no.
+[x] Tokens QR DINÁMICOS (Modo B: el alumno escanea el QR de la academia) —
+    token rotativo firmado (HMAC, 60s) por clase activa; pantalla /display;
+    el alumno marca desde /me (elige la clase + escanea). También muestra su
+    propio QR en /me para el Modo A. (2026-07-03) Ver entrada [E19].
+[x] Panel de "pendientes antiguas" + recordatorios (profe Y alumno) —
+    AlertsService: alumnos en riesgo (cuponera por vencer ≤7d, última clase,
+    deuda) y pendientes de clases finalizadas. Banner de avisos en /me y ficha
+    (crítico en ROJO), sección Recordatorios en el dashboard y banner de
+    pendientes antiguas en /teacher. (2026-07-03) Ver [E27].
+[x] Ajustar la vista SQL student_balance (D12) — debt_classes ahora suma también
+    las asistencias confirmadas no cubiertas (aplica a Postgres/Supabase; en
+    SQLite ya lo calculaba el backend). (2026-07-03) Ver [E27].
 
 --- FRONTEND -------------------------------------------------------------
-[ ] Iconos PWA (public/icon-192.png, icon-512.png) + service worker.
-[ ] Guard por rol en /teacher y /checkin (hoy se apoyan en el 401 del API).
-[ ] Mejoras UX del panel del profesor (foto grande, búsqueda, etc.).
+[x] Guardia de sesión en todas las páginas (useAuth) + barra de navegación
+    por rol + notificaciones (toasts) + skeletons. (2026-07-02)
+[x] Guard por rol estricto en /checkin (y /teacher, /teacher/session, /display) —
+    useAuth acepta una lista de roles; estas páginas exigen admin|teacher en el
+    cliente (un alumno es redirigido a /). (2026-07-03) Ver [E26].
 
 --- AUTENTICACIÓN / INFRA ------------------------------------------------
 [ ] Migrar / sumar Supabase Auth (hoy auth propia con JWT — decisión D15).
@@ -46,6 +84,40 @@
 --- DECISIONES DE NEGOCIO A CONFIRMAR (si surgen) ------------------------
 [ ] Reglas finas de redondeo/montos de pagos y precios de cuponeras reales.
 [ ] Política de auto-expiración de asistencias pendientes no confirmadas.
+
+--- BACKLOG DE MEJORAS / POTENCIALES PENDIENTES (detectados 2026-07-03) ---
+(No son bloqueantes; se anotan para priorizar más adelante.)
+
+  PRODUCTO
+  [ ] App móvil NATIVA (React Native + Expo). Ver PLAN_MOBILE.txt. Es el bloque
+      grande si se quiere publicar en tiendas (alumno/profe con tablet/celular).
+  [x] CRUD de PROFESORES desde la UI — página /admin/teachers (alta, edición
+      por modal, baja/alta) + endpoints PUT/active + nav y dashboard. (2026-07-03) [E26]
+  [ ] Cancelar / anular cuponeras (hoy sólo se EXTIENDE; falta anular con su
+      reverso en el ledger, reason CorrectionReverse/Cancelled).
+  [ ] Reportes / métricas: ingresos por período, asistencia por clase, ranking
+      de morosos; export CSV de morosos/pagos.
+  [ ] Recordatorios / notificaciones: vencimiento de cuponera, deuda, clases
+      del día (in-app y/o push cuando haya móvil).
+  [ ] Compactar la meta de la card "Clases de hoy" a una línea (menor, estético).
+
+  TÉCNICO / INFRA
+  [ ] Configurar Qr:Secret propio en producción (hoy el token del QR Modo B cae
+      a la clave JWT si no se define Qr:Secret).
+  [ ] Refresh tokens / manejo de expiración de sesión (hoy JWT de 12h sin
+      refresco). Importante para móvil y para la UX web.
+  [ ] Deploy del backend a la nube + versionado de API (/api/v1). Prerrequisito
+      para la app móvil.
+  [ ] Paginación / búsqueda server-side en listados (hoy listStudents/listClasses
+      traen todo; ok para una academia chica, no escala).
+  [ ] Rate limiting / protección de fuerza bruta en el login (hoy sin límite de
+      intentos).
+
+  CALIDAD
+  [ ] Tests automatizados de los servicios nuevos: BillingService (cuponeras,
+      pagos, morosos, pagos pendientes) y QR Modo B (SessionQrService token/scan,
+      RegisterForSessionAsync). Hoy validados E2E a mano; el dominio tiene 12 tests.
+  [ ] Accesibilidad / foco de teclado en modales (Dialog) y navegación.
 
 ##########################################################################
 
@@ -289,6 +361,467 @@ VERIFICACIÓN: el backend ARRANCA OK (GET /health -> {"status":"ok"}); el login
 
 PENDIENTE: levantar Docker Desktop (manual) y correr el flujo E2E con datos demo.
       Luego: pagos/cuponeras desde admin (UI), fotos a Storage, y migración a Supabase.
+
+--------------------------------------------------------------------------
+2026-07-02 — Modo SQLite de desarrollo + validación E2E corriendo
+--------------------------------------------------------------------------
+CONTEXTO: se pidió correr y abrir la app para verla. Docker Desktop NO levanta
+      de forma headless en esta máquina (la distro WSL `docker-desktop` queda
+      "Stopped" y hay una instalación de WSL en curso que lo bloquea). Para no
+      depender de Docker, se agregó un proveedor SQLite para desarrollo.
+
+[D17] PROVEEDOR DE BD SELECCIONABLE (Npgsql | SQLite):
+      El backend elige el proveedor por configuración, sin tocar el camino
+      Postgres/Supabase (que sigue siendo el objetivo de producción).
+      - appsettings.Development.json: "Database:Provider" = "Sqlite" y
+        ConnectionStrings:Sqlite = "Data Source=mambo_dev.db".
+        Para volver a Postgres: quitar la clave o ponerla en "Npgsql".
+      - DependencyInjection.AddMamboInfrastructure: si Provider=Sqlite usa
+        UseSqlite(...).UseSnakeCaseNamingConvention(); si no, el camino Npgsql
+        con NpgsqlDataSourceBuilder + MapEnum (sin cambios).
+      - MamboDbContext.OnModelCreating: los HasPostgresEnum<...> se aplican
+        SOLO si Database.IsNpgsql(). En SQLite los enums se guardan como int
+        (consistente dentro de la misma BD; el esquema lo crea EF, no el SQL).
+      - Program.cs: al arrancar, si el proveedor es SQLite hace
+        db.Database.EnsureCreated() (crea el esquema desde el modelo EF).
+      - Infra csproj: se sumó Microsoft.EntityFrameworkCore.Sqlite 8.0.10.
+
+      NOTA: en SQLite no corre el SQL de db/ (migraciones/seed/vistas/RLS/
+      triggers). Por eso:
+        * El catálogo pass_type se siembra ahora también en el DevSeeder
+          (EnsureRolesAndPassTypesAsync), replicando db/seed/001_seed_base.sql.
+        * La vista student_balance y el trigger de balance NO existen en SQLite;
+          el saldo/deuda ya se calculan en el backend (StudentSummaryService),
+          así que el flujo funciona igual. Contra Postgres real siguen vigentes.
+      Este modo es SOLO para desarrollo/demo local; producción = Supabase.
+
+VERIFICACIÓN E2E (todo corriendo, no solo compilando):
+      - Backend .NET en http://localhost:5080 (Swagger en /swagger); esquema
+        SQLite creado al arrancar; GET /health -> {"status":"ok"}.
+      - POST /api/dev/seed -> datos demo creados.
+      - Login OK para admin / profe / alumno (JWT emitido en los tres).
+      - GET /api/sessions/today (profe) -> "Salsa Intermedios" con 2 pendientes.
+      - GET /api/me/panel (ana@) -> pack 6/8, pago $2200, historial.
+      - POST /api/checkin/qr {"qrCode":"STU-ANA-001"} -> devuelve la tarjeta de
+        verificación (nombre + saldo) del alumno.
+      - Frontend Next.js en http://localhost:3000 (abierto en el navegador).
+
+PENDIENTE: idéntico al checklist de arriba. Lo único que cambió es que ya se
+      puede ver/usar la app localmente sin Docker; validar contra Postgres real
+      queda opcional para cuando Docker/WSL esté disponible.
+
+--------------------------------------------------------------------------
+2026-07-02 — Rediseño profesional de marca + gestión de cuponeras/pagos
+--------------------------------------------------------------------------
+CONTEXTO: se agregó la carpeta /Referencias con la identidad visual de la
+      marca (flyers de horarios y de la fiesta): NEGRO + VERDE LIMA NEÓN,
+      logo de pareja bailando en un anillo, slogan "BAILÁ, CONECTÁ, DISFRUTÁ",
+      dirección Pablo de María 1474 esq. Brandzen, tel 092136401, y la grilla
+      de horarios 2026. Se pidió: (1) que la app se vea totalmente profesional
+      con "todos los gadgets posibles" y (2) continuar los pendientes.
+
+[E12] REDISEÑO FRONTEND — SISTEMA DE DISEÑO "MAMBO" (dark + neón):
+      - tailwind.config.ts: paleta de marca (lime #C4F82B + escala ink negra),
+        sombras con glow, gradientes (lime-grad/hero-grad), animaciones
+        (fade-up, shimmer, pulse-glow, spin).
+      - globals.css: tema oscuro base, textura de fondo (puntos + glow),
+        clases de componentes (.card, .btn-*, .field, .chip-*, .eyebrow).
+      - layout.tsx: fuentes Google — Anton (display, estilo póster) + Inter
+        (cuerpo). Metadata/manifest de marca. Provider de toasts global.
+      - Librería de componentes (src/components/ui/):
+          Icons.tsx (SVG inline, sin dependencias), Logo.tsx (marca + anillo),
+          Toast.tsx (notificaciones), index.tsx (Button, Card, Stat, Avatar,
+          Badge, Skeleton, EmptyState, Field, Spinner), TopBar.tsx (nav por
+          rol + Shell + PageHeader). format.tsx (etiquetas ES, fechas UY,
+          StatusBadge/PassBadge).
+      - TODAS las páginas reconstruidas con la nueva identidad:
+          / (landing con hero de marca), /login (accesos rápidos demo),
+          /horarios (grilla 2026 pública tipo flyer), /checkin (verificación
+          visual grande), /teacher + /teacher/session/[id], /me (panel alumno
+          con stats), /admin (dashboard con métricas), /admin/students (+ buscador),
+          /admin/students/[id] (ficha completa de gestión), /admin/classes
+          (grilla por día), /admin/passes, /admin/payments.
+      "Gadgets" sumados: toasts, skeletons de carga, stat tiles, badges,
+      avatars con ring, buscador, dashboard con métricas en vivo, hero animado,
+      efectos glow, nav sticky responsive (desktop + móvil).
+
+[E13] BACKEND — CUPONERAS, PAGOS Y MOROSOS (BillingService, rol admin):
+      Nuevo caso de uso BillingService (registrado en DI) + endpoints en
+      AdminController:
+        GET  /api/admin/passtypes            catálogo de cuponeras
+        POST /api/admin/passes               vender cuponera (Pass + crédito en
+                                             ledger + pago opcional confirmado)
+        POST /api/admin/passes/{id}/extend   extender días y/o clases (ledger
+                                             'extension', nunca edita historia)
+        POST /api/admin/payments             registrar pago manual (conf/pend)
+        GET  /api/admin/debtors              morosos (saldos negativos + asist.
+                                             confirmadas no cubiertas, D12)
+        GET  /api/admin/students/{id}        ficha (StudentPanel para gestión)
+        POST /api/admin/attendance/manual    asistencia manual (ManualAdmin)
+      Respeta las reglas núcleo: todo crédito pasa por el ledger inmutable;
+      las extensiones y consumos son movimientos, nunca ediciones.
+
+[E14] HORARIOS 2026 REALES:
+      - DevSeeder.SeedHorarios2026Async + POST /api/dev/seed-horarios: carga
+        las 23 clases de la grilla oficial (Lun-Vie 18:30/19:30/20:30/21:30 +
+        Sábado 14/15/16). Idempotente por (día, hora de inicio). Botón en el
+        dashboard admin.
+
+FIX (bug real encontrado al validar E2E):
+      [F1] SQLite no soporta ORDER BY sobre 'decimal'. BillingService.
+           ListPassTypesAsync ordenaba por Price (decimal) en SQL y tiraba
+           System.NotSupportedException. Se corrigió ordenando en memoria
+           tras el ToListAsync. (El camino Npgsql no se ve afectado.)
+
+VERIFICACIÓN (todo corriendo, no solo compilando):
+      - Backend recompila 0 errores / 0 warnings; frontend `tsc --noEmit` OK;
+        todas las rutas responden 200.
+      - E2E vía API con token admin: passtypes OK; asignar Pack 8 con pago
+        (crédito 8 en ledger); registrar pago manual; extender +15 días +2
+        clases (8 -> 10 restantes); asistencia manual idempotente ("ya existía");
+        morosos. Ficha del alumno en el front carga OK.
+      - App abierta en el navegador (http://localhost:3000).
+
+NOTA: la página /horarios usa la grilla fija de la marca (contenido de
+      marketing); las clases operativas viven en la BD (seed-horarios). A
+      futuro se puede unificar con un endpoint público de la grilla.
+
+--------------------------------------------------------------------------
+2026-07-03 — Gestión operativa: CRUD alumnos/clases, pagos pendientes,
+             sesiones del día y carnet QR
+--------------------------------------------------------------------------
+CONTEXTO: se pidió continuar con los pendientes del checklist. Se cerró un
+      lote coherente de gestión operativa (todo verificado corriendo, no sólo
+      compilando), respetando las reglas núcleo (backend = única autoridad de
+      escritura; ledger inmutable para créditos; sin pasarela de pago).
+
+[E15] BACKEND — EDICIÓN Y BAJA LÓGICA (AdminService + AdminController):
+      - Alumnos:  PUT  /api/admin/students/{id}          (nombre, teléfono, doc, notas)
+                  POST /api/admin/students/{id}/active    (baja/alta lógica; también
+                                                           inhabilita el AppUser)
+      - Clases:   PUT  /api/admin/classes/{id}           (horario/estilo/nivel + reemplazo
+                                                           del set de profesores)
+                  POST /api/admin/classes/{id}/active     (baja/alta lógica; no borra
+                                                           sesiones ya generadas)
+      - GET /api/admin/students ahora incluye phone; GET /api/admin/classes
+        incluye isActive, room y teacherIds (para prellenar la edición).
+      Todas las operaciones quedan auditadas (AuditService).
+
+[E16] BACKEND — PAGOS PENDIENTES (BillingService):
+      - GET  /api/admin/payments/pending        lista de pagos en estado Pending.
+      - POST /api/admin/payments/{id}/confirm    confirma (setea PaidAt/ConfirmedBy;
+                                                  si el pago estaba ligado a una
+                                                  cuponera, la marca como paga).
+      - POST /api/admin/payments/{id}/cancel     cancela (no permite cancelar uno
+                                                  ya confirmado).
+      El registro de pago (POST /payments) ya soportaba confirmed=false; la UI
+      ahora expone el checkbox para dejarlo pendiente.
+
+[E17] BACKEND — SESIONES DEL DÍA (AdminService.EnsureTodaySessionsAsync):
+      - POST /api/sessions/ensure-today (política TeacherOrAdmin, para que el
+        profesor pueda generarlas). Recorre las clases activas cuyo weekday
+        coincide con HOY (fecha local Montevideo = UTC-3) y hace EnsureSession
+        de cada una. Idempotente. Devuelve la cantidad de clases del día.
+
+[E18] FRONTEND — UI de todo lo anterior + CARNET QR:
+      - Ficha del alumno (/admin/students/[id]): botón Editar (form nombre/tel/doc),
+        Dar de baja / Reactivar, badge "Dado de baja", y tarjeta "Carnet QR" con
+        el QR generado desde el código fijo (componente StudentQr, lib 'qrcode',
+        100% offline) + "Imprimir carnet" (ventana con estilo de marca).
+      - /admin/classes: Editar (reusa el form en modo edición, prellena profesores)
+        y Baja/Alta por clase, con estilo atenuado + badge "Inactiva".
+      - /admin/payments: checkbox "confirmado" al registrar + sección "Pagos
+        pendientes de confirmar" con Confirmar / Cancelar por pago.
+      - Panel del profesor (/teacher) y dashboard admin: botón "Generar clases
+        de hoy" (llama ensure-today y refresca la lista).
+      - api.ts: updateStudent, setStudentActive, updateClass, setClassActive,
+        ensureTodaySessions, listPendingPayments, confirmPayment, cancelPayment
+        + tipos (StudentRow.phone, ClassRow.isActive/room/teacherIds, PendingPayment).
+      - Dependencia nueva: qrcode ^1.5.4 (+ @types/qrcode).
+
+VERIFICACIÓN E2E (backend :5080 + frontend :3000 corriendo, SQLite):
+      - ensure-today (viernes 2026-07-03) -> 4 clases del día disponibles.
+      - PUT alumno -> 204, nombre y teléfono actualizados; baja -> isActive=false;
+        alta -> isActive=true.
+      - PUT clase (payload ASCII) -> 204, nombre/nivel cambiados y profesores
+        reemplazados (1 -> 0); baja/alta de clase -> 204.
+      - Pagos: 2 pendientes creados -> listado muestra 2; confirmar uno + cancelar
+        el otro -> 0 pendientes; doble-confirmar y cancelar-confirmado devuelven
+        400 con mensaje claro (guardas OK).
+      - Backend build 0/0; frontend tsc --noEmit OK; next lint sin errores; las 12
+        rutas responden 200 (incl. la ficha con el QR).
+
+NOTA (artefacto de shell, NO bug): al probar por curl desde Git Bash, los
+      cuerpos JSON con caracteres no-ASCII (ñ, @) se corrompen a nivel shell y
+      el backend responde 400 de validación. Con payload ASCII y desde el fetch
+      del frontend (UTF-8 real) funciona. Igual criterio que el hallazgo de "Seña".
+
+PENDIENTE (sin cambios de prioridad; ver checklist de arriba): íconos PWA + SW,
+      endpoint público de la grilla para /horarios, fotos a Supabase Storage,
+      tokens QR dinámicos (Modo B), vista SQL student_balance (D12), y la
+      migración a Supabase (Auth + Storage + migraciones reales).
+
+--------------------------------------------------------------------------
+2026-07-03 — Modo B: QR dinámico por clase + el alumno marca su asistencia
+--------------------------------------------------------------------------
+CONTEXTO: se pidió que el ALUMNO sea protagonista del check-in, con dos
+      caminos: (A) el alumno muestra su QR y la recepción lo escanea (ya existía
+      el backend; faltaba mostrarlo en su cuenta), y (B) el alumno escanea, desde
+      su celular, un QR DINÁMICO por clase activa y eso le marca la asistencia.
+      Decisiones tomadas con el cliente: QR por clase (no por sede), token
+      ROTATIVO firmado (anti-captura), y "tap elige la clase + escaneo obligatorio"
+      (prueba de presencia). Ambos caminos terminan en asistencia PENDIENTE que
+      el profe confirma (ahí recién se descuenta) — consistente con las reglas.
+
+[E19] BACKEND — TOKEN ROTATIVO + SCAN DEL ALUMNO + PANTALLA:
+      - SessionQrService (Application): genera y valida un token por sesión
+        con formato MB2.{sessionId}.{slot}.{firma}. slot = floor(unix/60);
+        firma = HMAC-SHA256(secreto, "sessionId:slot") (16 hex). Válido sólo para
+        el slot actual o el anterior (~2 min) => una foto vieja NO sirve. La firma
+        prueba autenticidad (sólo el server la crea); el slot prueba frescura.
+        Comparación en tiempo constante. Secreto: config "Qr:Secret" o, en su
+        defecto, la clave JWT.
+      - CheckInService.RegisterForSessionAsync: check-in sobre una sesión
+        EXPLÍCITA (la del token), valida que esté activa [inicio, fin+30min],
+        anti-duplicado por (alumno, sesión), crea asistencia Pendiente con
+        source = QrStudent (Modo B). IsSessionScannable(...) como regla reutilizable.
+      - Endpoints del alumno (MeController, [Authorize]):
+          GET  /api/me/qr             mi código de QR fijo (para el Modo A).
+          GET  /api/me/active-classes clases corriendo ahora (SIN token).
+          POST /api/me/scan {token}   valida el token y marca mi asistencia.
+      - Pantalla de la academia (DisplayController, [TeacherOrAdmin]):
+          GET  /api/display/active    clases activas CON su token vigente +
+                                      rotateInSeconds. Los tokens NO se exponen a
+                                      los alumnos (deben escanear).
+      - "Activa" se resuelve por instante absoluto (StartAt <= now <= EndAt+30min),
+        NO por fecha de calendario, para evitar líos de zona horaria (UTC-3).
+
+[E20] FRONTEND — UI del alumno + display + QR reutilizable:
+      - /me: card "Marcar asistencia" (lista de clases activas; tap "Escanear"
+        abre la cámara con QrScanner y postea el token) + card "Mi QR" (muestra
+        el propio QR con StudentQr para el Modo A).
+      - /display: pantalla para la recepción/pantalla del salón; un QR grande por
+        clase activa (componente QrImage), refresco cada 15s para mantener el token
+        fresco. NavCard "Pantalla QR" en el dashboard admin.
+      - components/QrImage.tsx: QR genérico (data URL, offline) a partir de un texto.
+      - api.ts: getMyQr, getActiveClasses, scanCheckIn, getDisplayActive + tipos.
+
+VERIFICACIÓN E2E (backend :5080 + frontend :3000, SQLite; DB reseteada para
+      tener una clase activa en el horario real de la prueba):
+      - display/active (admin) -> 1 clase activa con token + rotateInSeconds.
+      - GET /api/me/qr (ana) -> STU-ANA-001; active-classes -> 1 (Salsa Intermedios).
+      - Alumno NUEVO escanea token fresco -> asistencia creada (Pending, source
+        QrStudent, alreadyExisted:false) y aparece en la lista del profe.
+      - Re-escaneo -> idempotente ("Ya habías marcado").
+      - Token con firma manipulada -> 400; token con slot viejo -> 400.
+      - display/active con token de ALUMNO -> 403 (no acceden a los tokens).
+      - Backend build 0/0; frontend tsc + lint OK; /me y /display responden 200.
+
+NOTA OPERATIVA: como el modo SQLite es de desarrollo, el seed de sesión usa
+      StartAt=now-80m / EndAt=now+10m para que haya una clase activa al instante;
+      el seed es idempotente, así que para reprobar el flujo "en vivo" conviene
+      borrar mambo_dev.db (o esperar al horario real de una clase de la grilla).
+
+--------------------------------------------------------------------------
+2026-07-03 — Modales de marca en reemplazo de los diálogos nativos
+--------------------------------------------------------------------------
+[E21] UX — DIÁLOGOS PROFESIONALES (adiós a window.prompt/confirm/alert):
+      - Nuevo DialogProvider + hook useDialog() (components/ui/Dialog.tsx) con
+        API basada en promesas: confirm({title, message, tone}) => bool y
+        prompt({title, fields[]}) => {name: value} | null. Overlay con blur,
+        panel estilo .card, cierre por backdrop/Escape, Enter para aceptar,
+        autofocus del primer campo. Montado en el layout (dentro de ToastProvider).
+      - Se reemplazaron TODOS los diálogos nativos:
+          * Profesor / corregir y rechazar asistencia -> modal con textarea de motivo.
+          * Ficha del alumno / extender cuponera -> modal con 2 campos (días + clases);
+            dar de baja -> modal de confirmación (tono danger).
+          * Clases / desactivar -> modal de confirmación (tono danger).
+      Verificación: sin ocurrencias de window.prompt/confirm/alert; tsc + lint OK;
+      rutas afectadas responden 200.
+
+--------------------------------------------------------------------------
+2026-07-03 — Pase de responsive (mobile 360px, ej. Galaxy S8+)
+--------------------------------------------------------------------------
+[E22] RESPONSIVE — se corrigieron los desbordes horizontales en pantallas
+      angostas (360px):
+      - /display: el QR era de 320px fijos y se salía de la pantalla. Ahora
+        QrImage es responsive (w-full con tope de tamaño) y la caja blanca se
+        acota (max-w-[300px]); el QR queda centrado y entero (medido: 262px de
+        ancho dentro de 360). Padding del card reducido en móvil.
+      - Confirmar/Corregir/Rechazar (asistencias del profe): pasaron de una fila
+        de 3 botones a una grilla (Confirmar full-width arriba; Corregir/Rechazar
+        abajo). No se aprietan a 360px.
+      - PageHeader: las acciones ahora envuelven (flex-wrap) y el título permite
+        break-words; el bloque de título usa min-w-0.
+      - Cabeceras con nombre/email (mi panel y ficha del alumno): min-w-0 + truncate
+        para que un texto largo no empuje el layout.
+      - Shell <main> con overflow-x-clip como red de seguridad (no afecta al header
+        sticky ni a la grilla de /horarios, que scrollea internamente).
+      VERIFICACIÓN: auditoría headless (Chrome, 360x740) de las 14 rutas (admin y
+      alumno): scrollWidth == viewport en todas, sin elementos que sobresalgan.
+      (La dependencia puppeteer-core usada para medir se quitó luego.)
+
+--------------------------------------------------------------------------
+2026-07-03 — Nav: el item seleccionado siempre visible/centrado
+--------------------------------------------------------------------------
+[E23] La barra de navegación (sobre todo la móvil, con scroll horizontal)
+      volvía al inicio al refrescar, dejando el item activo fuera de vista si
+      era de los últimos. Ahora el link activo se centra en su barra al cargar
+      y al cambiar de ruta (scrollIntoView inline:center, block:nearest, para
+      no mover la página en vertical). Aplica a la nav desktop y móvil.
+      VERIFICACIÓN (headless, 360px): en /admin/payments (último), /admin/passes
+      (medio) y /checkin (primero) el item activo queda siempre visible; los del
+      medio quedan centrados, los extremos pegados a su borde visible (no se
+      puede centrar el primero/último porque no hay más contenido para desplazar).
+
+--------------------------------------------------------------------------
+2026-07-03 — Legibilidad de títulos, selects y responsive de cards
+--------------------------------------------------------------------------
+[E24] Ajustes de UI pedidos tras probar en mobile (Galaxy S8+):
+      - TÍTULOS ILEGIBLES: la base CSS forzaba TODA h1–h4 a la tipografía póster
+        (Anton, condensada + tracking negativo), por eso títulos de sección como
+        "Vender cuponera" salían apretados y difíciles de leer. Se quitó esa regla:
+        ahora los títulos usan Inter (cuerpo) por defecto y el look póster se aplica
+        puntual con .font-display (PageHeader, días, hero, etc., que ya lo tienen).
+      - BRILLO: se bajó .text-glow (de 24px/0.45 a 12px/0.25) para que los títulos
+        con glow (marca/hero) no encandilen.
+      - SELECTS: la flecha nativa quedaba pegada al borde. Ahora los <select.field>
+        usan una flecha propia (SVG) con margen (~0.85rem) y padding a la derecha.
+      - CARDS NO RESPONSIVE (raíz encontrada): varias grillas usaban "grid gap-N"
+        SIN columnas base; una grilla con track "auto" crece al max-content e ignora
+        el ancho del contenedor (se salía y overflow-x-clip lo ocultaba recortando).
+        Se agregó grid-cols-1 a todas las grillas de una sola columna (track
+        minmax(0,1fr)) → el contenido se ajusta y trunca bien. Afecta /admin/classes,
+        /teacher, ficha, pagos, etc.
+      - /admin/classes: cada clase ahora apila los botones (Editar/Baja) debajo con
+        un divisor; el badge de nivel queda visible. /teacher: la meta de la clase
+        envuelve y la columna de conteos no aplasta el título; hora en 24h.
+      VERIFICACIÓN: auditoría headless por elemento (getBoundingClientRect) a 360px
+      de las 14 rutas → 0 desbordes de contenido (sólo scrollean, a propósito, la
+      barra de nav y la grilla semanal de /horarios). Capturas revisadas.
+
+--------------------------------------------------------------------------
+2026-07-03 — Documento de muestra del producto (HTML + PDF)
+--------------------------------------------------------------------------
+[E25] Se generó una presentación del producto pantalla por pantalla, con
+      capturas REALES en móvil (390px) y descripción de "qué tiene / cómo
+      funciona" por cada una de las 14 pantallas (público, recepción/QR modos
+      A y B, profesor, admin y alumno):
+      - PRESENTACION_PRODUCTO.html  (autocontenido; capturas embebidas en base64)
+      - PRESENTACION_PRODUCTO.pdf   (A4, 17 páginas; portada de marca + "de un
+                                     vistazo" + una pantalla por sección)
+      Se armó automatizando Chrome (headless) para loguear cada rol, capturar
+      la pantalla completa y componer el HTML con estilo de marca (negro + lima,
+      marco de teléfono, listas). Para regenerar: correr backend+frontend, seed
+      + seed-horarios (idealmente con la BD reseteada para tener una clase activa),
+      y reejecutar el build (usa Chrome del sistema; puppeteer-core temporal).
+
+--------------------------------------------------------------------------
+2026-07-03 — Pendientes: horarios desde BD, CRUD profes, guards, PWA
+--------------------------------------------------------------------------
+[E26] Lote de pendientes cerrado (todo local/SQLite, verificado corriendo):
+      - HORARIOS PÚBLICOS DESDE LA BD: PublicController GET /api/public/schedule
+        (anónimo) devuelve las clases activas. /horarios pasó a componente cliente
+        (HorariosGrid) que arma la grilla desde ese endpoint, con FALLBACK a la
+        grilla fija de marca si el backend no responde. Metadata queda en el server
+        component. Verificado: 24 clases, grilla y sábado renderizados.
+      - CRUD DE PROFESORES: AdminService.UpdateTeacherAsync/SetTeacherActiveAsync
+        + endpoints PUT /api/admin/teachers/{id} y POST .../active; lista ahora
+        incluye bio. UI nueva /admin/teachers (alta, edición por modal, baja/alta)
+        + item de nav "Profesores" + NavCard en el dashboard. Verificado E2E.
+      - GUARDS DE ROL: useAuth ahora acepta string | string[]. /checkin, /teacher,
+        /teacher/session/[id] y /display exigen admin|teacher en el cliente
+        (un alumno queda redirigido a /). Verificado headless.
+      - PWA: íconos de marca reales public/icon-192.png y icon-512.png (negro
+        full-bleed + bailarín lima, zona segura para maskable), generados con
+        Chrome headless. sw.js (cache del app shell + network-first, sólo mismo
+        origen; la API pasa directo) + ServiceWorkerRegister (registra en
+        PRODUCCIÓN para no interferir con el HMR de dev). Manifest ya referencia
+        los íconos; se sumó icons/apple en metadata.
+      Backend build 0/0; frontend tsc + lint OK; rutas 200; capturas revisadas.
+
+--------------------------------------------------------------------------
+2026-07-03 — Recordatorios/avisos (alumno + profe + admin) y vista D12
+--------------------------------------------------------------------------
+[E27] RECORDATORIOS con criticidad en ROJO + PENDIENTES ANTIGUAS:
+      Reglas únicas en PassAlerts (fuente compartida alumno/admin):
+        · CRÍTICO (rojo) — SÓLO pase libre y cuponeras (packs): vencida, vence en
+          ≤ 7 días, o queda 1 clase.
+        · AVISO (ámbar): vence en ≤ 14 días, o quedan 2 clases.
+        · CLASE SUELTA: nunca es crítica. Sólo aviso ámbar "Tenés una clase suelta
+          por usar" mientras tenga saldo y esté vigente.
+        (Sólo cuponeras activas; "quedan N clases" y "última clase" son sólo para packs.)
+      - AlertsService: ListStudentsAtRiskAsync (alumnos con cuponera crítica/por
+        vencer) y ListOldPendingAsync (asistencias pendientes de clases ya
+        finalizadas; crítico si terminó hace >24h).
+      - Los avisos del alumno viajan DENTRO de StudentPanel (Alerts), así /me y la
+        ficha del admin los reciben sin llamadas extra; se agrega la deuda como
+        aviso crítico.
+      - Endpoints: GET /api/admin/alerts { studentsAtRisk, oldPending } y
+        GET /api/sessions/pending-old (TeacherOrAdmin).
+      - UI: componente AlertsBanner (rojo/ámbar) en /me y ficha; filas de cuponera
+        crítica resaltadas en rojo (borde + saldo + "Vence" + badge "Crítico");
+        sección "Recordatorios" en el dashboard admin (alumnos en riesgo + link a
+        pendientes); banner "Pendientes de clases ya finalizadas" en /teacher.
+      - DEMO: el seeder agrega a Ana una cuponera balance 1 y vto +3 días para que
+        los avisos críticos se vean de una (reset de mambo_dev.db para tomarlo).
+
+[E28] VISTA SQL student_balance (D12): debt_classes = saldos negativos de
+      cuponeras + COUNT de asistencias confirmadas no cubiertas (pass_id null y
+      covered_by_unlimited=false). Alinea la vista con lo que ya calcula el
+      backend (StudentSummaryService). Aplica al reejecutar db/migrations/004 en
+      Postgres/Supabase; SQLite no usa las vistas.
+
+VERIFICACIÓN (corriendo): backend build 0/0; frontend tsc + lint OK; E2E:
+      /me/panel de Ana devuelve 2 avisos críticos ("Vence en 3 días", "Queda 1
+      clase"); /admin/alerts los agrega; /sessions/pending-old responde 200.
+      Capturas de /me y /admin revisadas (rojo correcto).
+
+--------------------------------------------------------------------------
+2026-07-03 — Instalación PWA: aviso al primer login + Configuración
+--------------------------------------------------------------------------
+[E29] Botón/aviso para instalar la app + apartado de Ajustes:
+      - usePwaInstall (hook): captura beforeinstallprompt (Android/Chrome/escritorio),
+        detecta iOS (instalación manual por Safari) y si ya está instalada (standalone).
+      - InstallBanner: aparece la PRIMERA vez tras login (banner de marca con "Instalar
+        app" + descartar). Al aceptar o cerrar, guarda mambo.installPromptSeen y NO vuelve
+        a aparecer. Se oculta en /settings. Montado en el Shell (todas las páginas con sesión).
+      - /settings (Ajustes): ícono de RUEDA en la barra superior (junto a salir). Card
+        "Instalar como aplicación" con botón nativo, o instrucciones para iOS / navegador,
+        o "ya instalada". Card "Aviso de instalación" con "Volver a mostrar el aviso"
+        (limpia el flag para que el banner reaparezca).
+      - Íconos nuevos: IconGear, IconDownload, IconShare.
+      Recordatorio operativo: la instalación nativa/el service worker requieren HTTPS y
+      build de producción; en dev el botón cae a instrucciones. tsc + lint OK; capturas
+      revisadas (banner + ajustes).
+
+--------------------------------------------------------------------------
+2026-07-03 — Supabase conectado: esquema aplicado + backend verificado
+--------------------------------------------------------------------------
+[E30] Proyecto Supabase MontevideoMamboProyect (ref cjqxzabpindinvmekzlu):
+      - Se generó supabase/deploy.sql (001..006 + seed, SIN el stub de auth local)
+        y supabase/migrations/* (para `supabase db push`). Ver SUPABASE_SETUP.md.
+      - Esquema aplicado por SQL Editor: tablas, enums, vistas, triggers y RLS OK.
+      - Backend .NET verificado contra Supabase (Npgsql, IPv6 + SSL Require):
+        conecta, mapea enums, login admin real devuelve JWT. La cadena que sirve:
+        Host=db.<ref>.supabase.co;Port=5432;Database=postgres;Username=postgres;
+        Password=***;SSL Mode=Require;Trust Server Certificate=true
+        (en el deploy va como variable de entorno ConnectionStrings__Supabase; el
+         provider como Database__Provider=Npgsql).
+      - Datos demo sembrados en Supabase (admin/profe/ana/leo) + grilla 2026 (23).
+      - IMPORTANTE (aclaración): el frontend NO usa @supabase/supabase-js ni
+        @supabase/ssr; habla con el backend .NET. La publishable/anon key hoy no
+        se usa (sólo haría falta con Supabase Auth).
+
+FIX (bug real que SQLite ocultaba):
+      [F2] El seed demo creaba la clase "Salsa Intermedios" a las 20:00–21:30 en
+           el weekday de hoy, que SE SOLAPA con la grilla 2026. En Postgres la
+           restricción de exclusión no_overlap_class (weekday + rango, WHERE
+           is_active) lo rechaza (500 23P01); en SQLite no existe esa restricción,
+           por eso pasaba. Se movió la clase demo a 12:00–13:30 (fuera de la
+           grilla) para que /api/dev/seed y /api/dev/seed-horarios convivan en
+           Postgres. En Supabase se resolvió además desactivando la clase demo
+           (la restricción sólo aplica a is_active), y así entró la grilla (23).
 
 ==========================================================================
  (Agregar nuevas entradas debajo, en orden cronológico)
