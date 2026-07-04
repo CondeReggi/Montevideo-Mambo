@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/useAuth";
 import { Shell, PageHeader } from "@/components/ui/TopBar";
 import { Button, Card, Badge, Skeleton, EmptyState } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
+import { useRegisterRefresh } from "@/components/Refresh";
 import { IconCalendar, IconClock, IconChevron, IconPlus, IconAlert } from "@/components/ui/Icons";
 
 export default function TeacherHome() {
@@ -31,6 +32,7 @@ export default function TeacherHome() {
     if (!ready) return;
     load();
   }, [ready, load]);
+  useRegisterRefresh(load);
 
   const generate = async () => {
     setBusy(true);

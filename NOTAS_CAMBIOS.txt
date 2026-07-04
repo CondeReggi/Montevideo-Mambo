@@ -920,6 +920,22 @@ FIX [F6] enum.ToString() en Selects traducidos a SQL: en Postgres devolvía la
       Verificado en Supabase: cuponera impaga -> summary.debtMoney=$1200 y aparece
       en morosos aunque no deba clases.
 
+--------------------------------------------------------------------------
+2026-07-03 — Pull-to-refresh (tirar para actualizar) en toda la app
+--------------------------------------------------------------------------
+[E35] Gesto "tirar hacia abajo desde arriba para actualizar" como las apps pro:
+      - components/Refresh.tsx: RefreshProvider (registro de recargadores por
+        pantalla) + useRegisterRefresh(fn) + PullToRefresh (gesto táctil con
+        spinner que baja con el dedo; se activa sólo con scroll arriba de todo;
+        umbral 72px; soft-refresh, sin recargar toda la página).
+      - Montado global en el layout; globals.css con overscroll-behavior-y:contain
+        para que no compita el pull-to-refresh nativo del navegador (que recarga todo).
+      - Cada pestaña registra su carga: /admin, /admin/students, /admin/teachers,
+        /admin/classes, /admin/passes, /admin/payments, /admin/students/[id],
+        /teacher, /teacher/session/[id], /me, /display. (/checkin y /settings no
+        tienen datos que recargar.)
+      Verificado: emulando el gesto en /admin dispara las 5 recargas de datos. ✅
+
 ==========================================================================
  (Agregar nuevas entradas debajo, en orden cronológico)
 ==========================================================================

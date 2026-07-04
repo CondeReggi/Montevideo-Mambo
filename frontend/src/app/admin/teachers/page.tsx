@@ -10,6 +10,7 @@ import { Shell, PageHeader } from "@/components/ui/TopBar";
 import { Card, Button, Field, Badge, Avatar, Skeleton, EmptyState } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { useDialog } from "@/components/ui/Dialog";
+import { useRegisterRefresh } from "@/components/Refresh";
 import { IconPlus, IconUsers } from "@/components/ui/Icons";
 
 export default function AdminTeachers() {
@@ -33,6 +34,7 @@ export default function AdminTeachers() {
   useEffect(() => {
     if (ready) load();
   }, [ready, load]);
+  useRegisterRefresh(load);
 
   const submit = async () => {
     setBusy(true);

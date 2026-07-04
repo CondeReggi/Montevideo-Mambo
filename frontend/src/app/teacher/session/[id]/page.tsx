@@ -17,6 +17,7 @@ import { Shell, PageHeader } from "@/components/ui/TopBar";
 import { Button, Card, Skeleton, EmptyState } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { useDialog } from "@/components/ui/Dialog";
+import { useRegisterRefresh } from "@/components/Refresh";
 import StudentCard from "@/components/StudentCard";
 import { IconArrowLeft, IconCheck, IconX, IconAlert, IconUsers } from "@/components/ui/Icons";
 
@@ -44,6 +45,7 @@ export default function SessionDetail() {
     if (ready) load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, id]);
+  useRegisterRefresh(load);
 
   const run = async (fn: () => Promise<unknown>, okMsg: string) => {
     setBusy(true);

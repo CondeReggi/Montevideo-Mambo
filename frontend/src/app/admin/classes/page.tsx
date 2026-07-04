@@ -7,6 +7,7 @@ import { Shell, PageHeader } from "@/components/ui/TopBar";
 import { Card, Button, Field, Badge, Skeleton, EmptyState } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { useDialog } from "@/components/ui/Dialog";
+import { useRegisterRefresh } from "@/components/Refresh";
 import { WEEKDAYS } from "@/components/format";
 import { IconPlus, IconCalendar, IconClock } from "@/components/ui/Icons";
 
@@ -42,6 +43,7 @@ export default function AdminClasses() {
   useEffect(() => {
     if (ready) load();
   }, [ready, load]);
+  useRegisterRefresh(load);
 
   const startCreate = () => {
     setEditId(null);

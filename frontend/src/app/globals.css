@@ -149,3 +149,9 @@ body::before {
     font-size: 16px;
   }
 }
+
+/* Evita el pull-to-refresh nativo del navegador (que recarga toda la página) para
+   que funcione el nuestro (soft refresh). No afecta el scroll normal. */
+html, body {
+  overscroll-behavior-y: contain;
+}

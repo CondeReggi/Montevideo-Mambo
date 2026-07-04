@@ -7,6 +7,7 @@ import { listStudents, createStudent, StudentRow, ApiError } from "@/lib/api";
 import { Shell, PageHeader } from "@/components/ui/TopBar";
 import { Card, Button, Field, Avatar, Badge, Skeleton, EmptyState } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
+import { useRegisterRefresh } from "@/components/Refresh";
 import { IconPlus, IconSearch, IconUsers, IconChevron } from "@/components/ui/Icons";
 
 const EMPTY = { fullName: "", email: "", password: "", documentId: "", phone: "", qrFixedCode: "" };
@@ -31,6 +32,7 @@ export default function AdminStudents() {
   useEffect(() => {
     if (ready) load();
   }, [ready, load]);
+  useRegisterRefresh(load);
 
   const filtered = useMemo(() => {
     if (!rows) return [];

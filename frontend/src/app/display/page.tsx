@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/useAuth";
 import { getDisplayActive, DisplaySession, ApiError } from "@/lib/api";
 import { Shell, PageHeader } from "@/components/ui/TopBar";
 import { Card, EmptyState } from "@/components/ui";
+import { useRegisterRefresh } from "@/components/Refresh";
 import { IconCalendar, IconQr } from "@/components/ui/Icons";
 import QrImage from "@/components/QrImage";
 
@@ -30,6 +31,7 @@ export default function DisplayScreen() {
     const t = setInterval(load, 15000); // refresco del token rotativo
     return () => clearInterval(t);
   }, [ready, load]);
+  useRegisterRefresh(load);
 
   const fmtHm = (iso: string) =>
     new Date(iso).toLocaleTimeString("es-UY", { hour: "2-digit", minute: "2-digit", hour12: false });

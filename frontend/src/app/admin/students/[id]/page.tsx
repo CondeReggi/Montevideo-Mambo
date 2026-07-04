@@ -28,6 +28,7 @@ import { PassBadge, StatusBadge, fmtDate, kindLabel, debtDisplay } from "@/compo
 import { IconArrowLeft, IconTicket, IconCash, IconCalendar, IconPlus, IconCheck, IconQr } from "@/components/ui/Icons";
 import StudentQr from "@/components/StudentQr";
 import AlertsBanner, { criticalPassIds } from "@/components/AlertsBanner";
+import { useRegisterRefresh } from "@/components/Refresh";
 
 export default function StudentDetailPage() {
   const { ready } = useAuth("admin");
@@ -70,6 +71,7 @@ export default function StudentDetailPage() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, id]);
+  useRegisterRefresh(load);
 
   const openEdit = () => {
     setEdName(panel?.summary.fullName ?? "");

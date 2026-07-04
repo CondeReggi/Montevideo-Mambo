@@ -3,6 +3,7 @@ import { Anton, Inter } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
 import { DialogProvider } from "@/components/ui/Dialog";
+import { RefreshProvider, PullToRefresh } from "@/components/Refresh";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 
 // Display tipo póster (coincide con los flyers de la marca) + cuerpo legible.
@@ -50,9 +51,12 @@ export default function RootLayout({
   return (
     <html lang="es" className="dark">
       <body className={`${display.variable} ${sans.variable} antialiased`}>
-        <ToastProvider>
-          <DialogProvider>{children}</DialogProvider>
-        </ToastProvider>
+        <RefreshProvider>
+          <ToastProvider>
+            <DialogProvider>{children}</DialogProvider>
+          </ToastProvider>
+          <PullToRefresh />
+        </RefreshProvider>
         <ServiceWorkerRegister />
       </body>
     </html>

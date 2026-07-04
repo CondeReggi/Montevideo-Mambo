@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/useAuth";
 import { listPassTypes, listStudents, assignPass, PassType, StudentRow, ApiError } from "@/lib/api";
 import { Shell, PageHeader } from "@/components/ui/TopBar";
 import { Card, Button, Skeleton } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
+import { useRegisterRefresh } from "@/components/Refresh";
 import { PassBadge, kindLabel } from "@/components/format";
 import { IconTicket, IconPlus } from "@/components/ui/Icons";
 
@@ -19,14 +20,17 @@ export default function AdminPasses() {
   const [pay, setPay] = useState(true);
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    if (!ready) return;
+  const load = useCallback(() => {
     listPassTypes().then((t) => {
       setTypes(t);
-      if (t[0]) setPassTypeId(t[0].id);
+      setPassTypeId((cur) => cur || t[0]?.id || "");
     });
     listStudents().then(setStudents).catch(() => setStudents([]));
-  }, [ready]);
+  }, []);
+  useEffect(() => {
+    if (ready) load();
+  }, [ready, load]);
+  useRegisterRefresh(load);
 
   const assign = async () => {
     setBusy(true);

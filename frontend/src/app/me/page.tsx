@@ -14,6 +14,7 @@ import { PassBadge, StatusBadge, fmtDate, kindLabel, debtDisplay } from "@/compo
 import StudentQr from "@/components/StudentQr";
 import QrScanner from "@/components/QrScanner";
 import AlertsBanner, { criticalPassIds, warnPassIds } from "@/components/AlertsBanner";
+import { useRegisterRefresh } from "@/components/Refresh";
 
 export default function MyPanel() {
   const { ready, session } = useAuth("student");
@@ -40,6 +41,10 @@ export default function MyPanel() {
     loadActive();
     getMyQr().then(setMyQr).catch(() => setMyQr(null));
   }, [ready, loadPanel, loadActive]);
+  useRegisterRefresh(() => {
+    loadPanel();
+    loadActive();
+  });
 
   const onScan = async (text: string) => {
     if (busy) return;

@@ -11,6 +11,7 @@ import {
 import { Shell, PageHeader } from "@/components/ui/TopBar";
 import { Card, Button, Field, Badge, Skeleton, EmptyState, Avatar } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
+import { useRegisterRefresh } from "@/components/Refresh";
 import { IconCash, IconAlert, IconChevron, IconClock, IconCheck, IconX, IconSpark } from "@/components/ui/Icons";
 import { fmtDate } from "@/components/format";
 
@@ -40,12 +41,15 @@ export default function AdminPayments() {
     }
   }, []);
 
-  useEffect(() => {
-    if (!ready) return;
+  const loadAll = useCallback(() => {
     listStudents().then(setStudents).catch(() => setStudents([]));
     loadDebtors();
     loadPending();
-  }, [ready, loadDebtors, loadPending]);
+  }, [loadDebtors, loadPending]);
+  useEffect(() => {
+    if (ready) loadAll();
+  }, [ready, loadAll]);
+  useRegisterRefresh(loadAll);
 
   const submit = async () => {
     setBusy(true);

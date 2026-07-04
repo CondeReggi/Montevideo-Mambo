@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/useAuth";
+import { useRegisterRefresh } from "@/components/Refresh";
 import {
   listStudents,
   listClasses,
@@ -43,8 +44,7 @@ export default function AdminHome() {
   const [oldPending, setOldPending] = useState<OldPending[]>([]);
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    if (!ready) return;
+  const load = useCallback(() => {
     listStudents().then(setStudents).catch(() => setStudents([]));
     listClasses().then(setClasses).catch(() => setClasses([]));
     listDebtors().then(setDebtors).catch(() => setDebtors([]));
@@ -52,7 +52,11 @@ export default function AdminHome() {
     getAdminAlerts()
       .then((a) => { setRisk(a.studentsAtRisk); setOldPending(a.oldPending); })
       .catch(() => {});
-  }, [ready]);
+  }, []);
+  useEffect(() => {
+    if (ready) load();
+  }, [ready, load]);
+  useRegisterRefresh(load);
 
   if (!ready) return null;
 
