@@ -47,11 +47,26 @@ public class CheckInService(IMamboDbContext db, IClock clock)
         if (!IsSessionScannable(session.StartAt, session.EndAt, now))
             throw new InvalidOperationException("La clase no está activa en este momento.");
 
+        // Anti-duplicado (hay un unique por alumno+sesión): si ya existe una asistencia
+        // ACTIVA (pendiente o confirmada) se bloquea; si estaba Rechazada/Corregida se
+        // REABRE como pendiente (no se puede insertar otra fila por la constraint).
         var existing = await db.Attendances
             .FirstOrDefaultAsync(a => a.StudentId == studentId && a.ClassSessionId == sessionId, ct);
         if (existing is not null)
-            return new CheckInResult(existing.Id, studentId, existing.Status, existing.IsAmbiguous,
-                false, true, "Ya habías marcado asistencia a esta clase.");
+        {
+            if (existing.Status is AttendanceStatus.Pending or AttendanceStatus.Confirmed)
+                return new CheckInResult(existing.Id, studentId, existing.Status, existing.IsAmbiguous,
+                    false, true, "Ya habías marcado asistencia a esta clase.");
+
+            existing.Status = AttendanceStatus.Pending;
+            existing.Source = source;
+            existing.CheckedInAt = now;
+            existing.IsAmbiguous = false;
+            existing.UpdatedAt = now;
+            await db.SaveChangesAsync(ct);
+            return new CheckInResult(existing.Id, studentId, existing.Status, false, false, false,
+                "Asistencia registrada como pendiente.");
+        }
 
         var attendance = new Attendance
         {
@@ -111,12 +126,28 @@ public class CheckInService(IMamboDbContext db, IClock clock)
             resolvedSource = AttendanceSource.OutOfWindowManual;
         }
 
-        // Anti-duplicado (regla R3): un registro por (alumno, sesión). Idempotente.
+        // Anti-duplicado (regla R3, con unique alumno+sesión): si ya hay una asistencia
+        // ACTIVA (pendiente o confirmada) se bloquea; si estaba Rechazada/Corregida se
+        // REABRE como pendiente (no se puede insertar otra fila por la constraint).
         var existing = await db.Attendances
             .FirstOrDefaultAsync(a => a.StudentId == studentId && a.ClassSessionId == target.Id, ct);
         if (existing is not null)
-            return new CheckInResult(existing.Id, studentId, existing.Status, existing.IsAmbiguous,
-                outOfWindow, true, "Ya existía un registro para esta clase.");
+        {
+            if (existing.Status is AttendanceStatus.Pending or AttendanceStatus.Confirmed)
+                return new CheckInResult(existing.Id, studentId, existing.Status, existing.IsAmbiguous,
+                    outOfWindow, true, "Ya existía un registro para esta clase.");
+
+            existing.Status = AttendanceStatus.Pending;
+            existing.Source = resolvedSource;
+            existing.CheckedInAt = now;
+            existing.IsAmbiguous = ambiguous;
+            existing.UpdatedAt = now;
+            await db.SaveChangesAsync(ct);
+            var reopenMsg = outOfWindow ? "Registrado fuera de ventana: pendiente de revisión."
+                : ambiguous ? "Registrado, pero la clase es ambigua: requiere revisión."
+                : "Asistencia registrada como pendiente.";
+            return new CheckInResult(existing.Id, studentId, existing.Status, ambiguous, outOfWindow, false, reopenMsg);
+        }
 
         var attendance = new Attendance
         {
