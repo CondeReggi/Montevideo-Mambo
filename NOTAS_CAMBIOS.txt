@@ -869,6 +869,19 @@ FIX [F4] Zona horaria (CRÍTICO): sessions/today, check-in y asistencia manual u
       Lección: SQLite (local) ocultaba ambos (no enforcea FKs; y probábamos de día).
       Validar contra Postgres/Supabase antes de dar por cerrado un flujo.
 
+--------------------------------------------------------------------------
+2026-07-03 — [F5] Re-registrar asistencia tras un rechazo
+--------------------------------------------------------------------------
+[F5] Reportado por el usuario: registrar → rechazar → registrar de nuevo decía
+     "ya estaba registrada", cuando debería poder registrarse otra vez.
+     El anti-duplicado bloqueaba por CUALQUIER asistencia existente, sin mirar el
+     estado. Como hay un unique (uq_attendance_student_session), no se puede
+     insertar otra fila; la solución correcta es REABRIR: si la existente está
+     Pendiente/Confirmada se bloquea (duplicado real), y si está Rechazada/Corregida
+     se vuelve a Pendiente (misma fila, nuevo check-in). Aplica a check-in por QR
+     (modo A) y scan del alumno (modo B). El rechazo queda en audit_log.
+     Verificado en prod. Commit c80833a.
+
 ==========================================================================
  (Agregar nuevas entradas debajo, en orden cronológico)
 ==========================================================================
