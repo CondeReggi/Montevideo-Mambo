@@ -78,6 +78,9 @@ public class BillingService(IMamboDbContext db, IClock clock, IAuditService audi
             };
             db.Payments.Add(payment);
             paymentId = payment.Id;
+            // Guardar el pago ANTES del ledger: el movimiento referencia payment_id por FK
+            // y Postgres la enforcea (SQLite no). Sin esto, el insert del ledger falla (23503).
+            await db.SaveChangesAsync(ct);
         }
 
         if (credit > 0)
