@@ -839,6 +839,36 @@ FIX (bug real que SQLite ocultaba):
       - Repo (ya existía en main): commit de toda la sesión + el paquete de deploy.
         Sin secretos en el repo (la password de Supabase va como env var en Render).
 
+--------------------------------------------------------------------------
+2026-07-03 — Publicado en producción (Vercel+Render+Supabase) + 2 bugs que
+             SQLite ocultaba, cazados con smoke test
+--------------------------------------------------------------------------
+[E32] DEPLOY EN VIVO:
+      - Frontend en Vercel (https://montevideomambo.vercel.app), backend en Render
+        (https://mambo-api.onrender.com, Docker), base en Supabase.
+      - Render (free) NO tiene salida IPv6 y el host directo de Supabase es IPv6 →
+        la conexión directa fallaba ("transient failure"). Solución: connection
+        string del POOLER (IPv4): Host=aws-1-us-west-2.pooler.supabase.com;Port=5432;
+        Username=postgres.<ref>;... (session mode). Región del proyecto: us-west-2.
+      - CORS del backend apuntando a la URL real de Vercel (montevideomambo, sin guiones).
+      - Verificado en prod: health, schedule (23), login admin, CORS, y smoke test de
+        escrituras (20/21 acciones OK; la 21 era la TZ, ya arreglada).
+
+FIX [F3] Asignar cuponera con pago fallaba en Postgres (500, 23503): el movimiento
+      del ledger referencia payment_id por FK y EF no ordenaba el pago antes en el
+      mismo SaveChanges. SQLite no enforcea FKs → local pasaba. Se guarda el pago
+      antes del ledger (misma tx). Commit 69a8379.
+
+FIX [F4] Zona horaria (CRÍTICO): sessions/today, check-in y asistencia manual usaban
+      fecha UTC, pero las sesiones se crean con fecha LOCAL (ensure-today). Entre las
+      21:00 y medianoche de Montevideo (00:00-03:00 UTC) la fecha UTC ya es el día
+      siguiente → 0 sesiones "de hoy" justo en horario de clases. Se agregó
+      IClock.LocalToday()/LocalNow() (UTC-3) y se unificó "hoy" = fecha local en
+      sessions, check-in, billing, alerts, panel, summary y seeder. Commit 82e0008.
+
+      Lección: SQLite (local) ocultaba ambos (no enforcea FKs; y probábamos de día).
+      Validar contra Postgres/Supabase antes de dar por cerrado un flujo.
+
 ==========================================================================
  (Agregar nuevas entradas debajo, en orden cronológico)
 ==========================================================================
