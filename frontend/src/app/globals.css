@@ -138,3 +138,14 @@ body::before {
     border-radius: 999px;
   }
 }
+
+/* En móvil, los campos con letra < 16px hacen que iOS/Safari auto-zoomee al
+   enfocarlos (y a veces queda ampliado). Forzamos 16px en pantallas chicas.
+   Va SIN @layer para ganarle a la clase .field. */
+@media (max-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}

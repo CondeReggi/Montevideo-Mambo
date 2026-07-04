@@ -38,6 +38,10 @@ export const viewport = {
   themeColor: "#0b0b0c",
   width: "device-width",
   initialScale: 1,
+  // Evita el zoom accidental (pinch / doble-tap) que quedaba pegado en la PWA:
+  // la app se comporta como una nativa.
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({
