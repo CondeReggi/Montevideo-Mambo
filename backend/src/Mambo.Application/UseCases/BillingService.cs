@@ -21,10 +21,14 @@ public class BillingService(IMamboDbContext db, IClock clock, IAuditService audi
     public async Task<List<PassTypeDto>> ListPassTypesAsync(CancellationToken ct = default)
     {
         // Nota: SQLite no soporta ORDER BY sobre decimal; se ordena en memoria por precio.
-        var list = await db.PassTypes.Where(t => t.IsActive)
-            .Select(t => new PassTypeDto(t.Id, t.Name, t.Kind.ToString(), t.ClassCount, t.Price, t.ValidityDays))
+        // Kind.ToString() se hace EN MEMORIA (en Postgres, dentro del SQL, devolvería la
+        // etiqueta snake_case del enum en vez del nombre C#).
+        var raw = await db.PassTypes.Where(t => t.IsActive)
+            .Select(t => new { t.Id, t.Name, t.Kind, t.ClassCount, t.Price, t.ValidityDays })
             .ToListAsync(ct);
-        return list.OrderBy(t => t.Price).ToList();
+        return raw.OrderBy(t => t.Price)
+            .Select(t => new PassTypeDto(t.Id, t.Name, t.Kind.ToString(), t.ClassCount, t.Price, t.ValidityDays))
+            .ToList();
     }
 
     /// <summary>Asigna una cuponera del catálogo a un alumno, con crédito inicial vía ledger.</summary>
@@ -98,6 +102,36 @@ public class BillingService(IMamboDbContext db, IClock clock, IAuditService audi
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         return pass.Id;
+    }
+
+    /// <summary>Cobra una cuponera que se había entregado impaga (registra el pago y la marca paga).</summary>
+    public async Task<Guid> PayPassAsync(Guid passId, string? method, Guid actor, CancellationToken ct = default)
+    {
+        var pass = await db.Passes.Include(p => p.PassType).FirstOrDefaultAsync(p => p.Id == passId, ct)
+            ?? throw new InvalidOperationException("Cuponera no encontrada.");
+        if (pass.IsPaid) throw new InvalidOperationException("La cuponera ya está paga.");
+
+        var now = clock.UtcNow;
+        var payment = new Payment
+        {
+            Id = Guid.NewGuid(),
+            StudentId = pass.StudentId,
+            Amount = pass.PassType.Price,
+            Method = string.IsNullOrWhiteSpace(method) ? "efectivo" : method!,
+            Status = PaymentStatus.Confirmed,
+            PassId = pass.Id,
+            Concept = pass.PassType.Name,
+            PaidAt = clock.LocalToday(),
+            ConfirmedBy = actor,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        db.Payments.Add(payment);
+        pass.IsPaid = true;
+        pass.UpdatedAt = now;
+        audit.Record(actor, "pay_pass", "pass", pass.Id, new { pass.PassType.Price });
+        await db.SaveChangesAsync(ct);
+        return payment.Id;
     }
 
     /// <summary>Extiende una cuponera: agrega días de vigencia y/o clases (crédito por ledger).</summary>

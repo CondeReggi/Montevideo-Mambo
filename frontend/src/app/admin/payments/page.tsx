@@ -11,7 +11,7 @@ import {
 import { Shell, PageHeader } from "@/components/ui/TopBar";
 import { Card, Button, Field, Badge, Skeleton, EmptyState, Avatar } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
-import { IconCash, IconAlert, IconChevron, IconClock, IconCheck, IconX } from "@/components/ui/Icons";
+import { IconCash, IconAlert, IconChevron, IconClock, IconCheck, IconX, IconSpark } from "@/components/ui/Icons";
 import { fmtDate } from "@/components/format";
 
 const METHODS = ["efectivo", "transferencia", "débito", "crédito"];
@@ -86,6 +86,17 @@ export default function AdminPayments() {
   return (
     <Shell>
       <PageHeader eyebrow="Administración" title="Pagos" subtitle="Registrá pagos manuales y controlá la morosidad." />
+
+      {/* Aviso: integración futura con Mercado Pago */}
+      <div className="mb-5 flex items-start gap-3 rounded-xl border border-sky-400/40 bg-sky-400/10 px-4 py-3 text-sm text-sky-200 animate-fade-up">
+        <span className="mt-0.5 text-lg text-sky-300"><IconSpark /></span>
+        <div>
+          <p className="font-semibold text-sky-100">Próximamente: Mercado Pago</p>
+          <p className="text-sky-200/80">
+            Vas a poder cobrar con link de pago / QR de Mercado Pago desde acá; por ahora los pagos se registran manualmente.
+          </p>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         {/* Registrar pago */}

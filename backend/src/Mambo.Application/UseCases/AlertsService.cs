@@ -19,19 +19,19 @@ public class AlertsService(IMamboDbContext db, IClock clock)
     public async Task<List<StudentRiskDto>> ListStudentsAtRiskAsync(CancellationToken ct = default)
     {
         var today = clock.LocalToday();
+        // Kind/Status a texto EN MEMORIA (en Postgres el SQL devolvería la etiqueta snake_case).
         var passes = await db.Passes
             .Where(p => p.Status == PassStatus.Active)
             .Select(p => new
             {
                 p.Id, p.StudentId,
                 FullName = p.Student.User.FullName,
-                Kind = p.Kind.ToString(),
-                p.Balance, p.ValidTo, Status = p.Status.ToString(),
+                p.Kind, p.Balance, p.ValidTo, p.Status,
             })
             .ToListAsync(ct);
 
         var risks = passes
-            .SelectMany(p => PassAlerts.ForPass(p.Id, p.Kind, p.Balance, p.ValidTo, p.Status, today)
+            .SelectMany(p => PassAlerts.ForPass(p.Id, p.Kind.ToString(), p.Balance, p.ValidTo, p.Status.ToString(), today)
                 .Select(a => new StudentRiskDto(p.StudentId, p.FullName, a.Level, a.Message)))
             .OrderBy(r => r.Level == "critical" ? 0 : 1)
             .ThenBy(r => r.FullName)

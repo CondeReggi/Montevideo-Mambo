@@ -882,6 +882,28 @@ FIX [F4] Zona horaria (CRÍTICO): sessions/today, check-in y asistencia manual u
      (modo A) y scan del alumno (modo B). El rechazo queda en audit_log.
      Verificado en prod. Commit c80833a.
 
+--------------------------------------------------------------------------
+2026-07-03 — Cuponera con pago diferido + cartel Mercado Pago + fix enums
+--------------------------------------------------------------------------
+[E33] CUPONERA "PAGAR DESPUÉS" (queda como deuda):
+      - Al asignar se puede NO cobrar (checkbox aclarado) → la cuponera se entrega
+        IMPAGA y queda como deuda del alumno.
+      - Nuevo POST /api/admin/passes/{id}/pay (BillingService.PayPassAsync): cobra
+        una cuponera impaga (registra el pago por el precio del tipo y la marca paga).
+        Botón "Cobrar" en la ficha, en cada cuponera impaga.
+      - La cuponera impaga aparece como AVISO (ámbar) "Cuponera impaga: $X" en /me y
+        en la ficha (viaja en StudentPanel.Alerts). PassDto ahora incluye Price.
+      - Cartel celeste "Próximamente: Mercado Pago" en /admin/payments (placeholder;
+        la integración real es a futuro — sin pasarela por ahora, decisión D7).
+
+FIX [F6] enum.ToString() en Selects traducidos a SQL: en Postgres devolvía la
+      etiqueta snake_case del enum (class_pack) en vez del nombre C# (ClassPack),
+      rompiendo en PRODUCCIÓN los labels/badges del front (kindLabel, StatusBadge,
+      "Libre") y las reglas de avisos del backend (kind == "ClassPack"). SQLite lo
+      ocultaba (devolvía PascalCase). Se convierte a texto EN MEMORIA (tras
+      ToListAsync) en StudentPanelService, BillingService.ListPassTypes y
+      AlertsService. Verificado en Supabase: kinds PascalCase + avisos OK.
+
 ==========================================================================
  (Agregar nuevas entradas debajo, en orden cronológico)
 ==========================================================================

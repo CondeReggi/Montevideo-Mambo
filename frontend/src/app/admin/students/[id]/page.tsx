@@ -9,6 +9,7 @@ import {
   listStudents,
   listPassTypes,
   assignPass,
+  payPass,
   registerPayment,
   extendPass,
   manualAttendance,
@@ -146,6 +147,7 @@ export default function StudentDetailPage() {
     return run(() => extendPass(passId, { extraDays: days, extraClasses: classes }), "Cuponera extendida.");
   };
   const doManual = () => run(() => manualAttendance(id), "Asistencia manual registrada.");
+  const doPayPass = (passId: string) => run(() => payPass(passId), "Cuponera cobrada.");
 
   if (!ready) return null;
 
@@ -244,14 +246,19 @@ export default function StudentDetailPage() {
                   </option>
                 ))}
               </select>
-              <label className="mb-4 flex items-center gap-2 text-sm text-muted-soft">
+              <label className="mb-2 flex items-start gap-2 text-sm text-muted-soft">
                 <input
                   type="checkbox"
                   checked={payWithPass}
                   onChange={(e) => setPayWithPass(e.target.checked)}
-                  className="h-4 w-4 accent-lime"
+                  className="mt-0.5 h-4 w-4 accent-lime"
                 />
-                Registrar el pago (${selectedType?.price ?? 0}) como confirmado
+                <span>
+                  Cobrar la cuponera ahora (${selectedType?.price ?? 0}).{" "}
+                  <span className="text-muted-dim">
+                    Si lo dejás sin tildar, se entrega <b className="text-amber-300">impaga</b> y queda como deuda del alumno (después la cobrás con “Cobrar”).
+                  </span>
+                </span>
               </label>
               <Button onClick={doAssign} loading={busy} disabled={!passTypeId} icon={<IconPlus />}>
                 Asignar cuponera
@@ -293,7 +300,10 @@ export default function StudentDetailPage() {
                   >
                     <PassBadge kind={p.kind} />
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium">{kindLabel(p.kind)}</p>
+                      <p className="flex items-center gap-1.5 text-sm font-medium">
+                        {kindLabel(p.kind)}
+                        {!p.isPaid && <Badge tone="amber">Impaga ${p.price}</Badge>}
+                      </p>
                       <p className={`text-xs ${isCrit ? "text-red-300" : "text-muted"}`}>
                         Vence {fmtDate(p.validTo)} · <StatusBadge status={p.status} />
                       </p>
@@ -301,6 +311,11 @@ export default function StudentDetailPage() {
                     <p className={`font-display text-xl ${isCrit ? "text-red-400" : "text-lime"}`}>
                       {p.kind === "UnlimitedMonth" ? "Libre" : p.balance}
                     </p>
+                    {!p.isPaid && (
+                      <Button className="btn-sm" onClick={() => doPayPass(p.id)} loading={busy} icon={<IconCash />}>
+                        Cobrar
+                      </Button>
+                    )}
                     <Button variant="ghost" className="btn-sm" onClick={() => doExtend(p.id)} disabled={busy}>
                       Extender
                     </Button>

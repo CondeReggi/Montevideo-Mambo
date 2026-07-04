@@ -186,7 +186,7 @@ export const getPublicSchedule = () => api<ScheduleItem[]>("/api/public/schedule
 export interface AlertItem { level: "critical" | "warn"; message: string; passId: string | null; }
 export interface StudentPanel {
   summary: StudentSummary;
-  passes: { id: string; kind: string; balance: number; initialCount: number | null; validFrom: string; validTo: string; status: string; isPaid: boolean; }[];
+  passes: { id: string; kind: string; balance: number; initialCount: number | null; validFrom: string; validTo: string; status: string; isPaid: boolean; price: number; }[];
   history: { id: string; date: string; className: string; status: string; source: string; coveredByUnlimited: boolean; }[];
   payments: { id: string; amount: number; method: string; status: string; paidAt: string | null; concept: string | null; }[];
   alerts: AlertItem[];
@@ -239,6 +239,9 @@ export const assignPass = (body: {
 
 export const extendPass = (passId: string, body: { extraDays: number; extraClasses: number; reason?: string }) =>
   api(`/api/admin/passes/${passId}/extend`, { method: "POST", body: JSON.stringify(body) });
+
+export const payPass = (passId: string, method?: string) =>
+  api<{ id: string }>(`/api/admin/passes/${passId}/pay`, { method: "POST", body: JSON.stringify({ method: method ?? null }) });
 
 export const registerPayment = (body: {
   studentId: string; amount: number; method: string; concept?: string; passId?: string; confirmed: boolean;

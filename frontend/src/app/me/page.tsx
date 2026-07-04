@@ -185,13 +185,13 @@ export default function MyPanel() {
                     <p className={`font-display text-xl ${isCrit ? "text-red-400" : "text-lime"}`}>
                       {p.kind === "UnlimitedMonth" ? "Libre" : p.balance}
                     </p>
-                    {isCrit ? (
+                    {!p.isPaid ? (
+                      <Badge tone="amber">Impaga ${p.price}</Badge>
+                    ) : isCrit ? (
                       <Badge tone="red">Crítico</Badge>
                     ) : isWarn ? (
                       <Badge tone="amber">Atención</Badge>
-                    ) : (
-                      !p.isPaid && <Badge tone="amber">Impago</Badge>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               );

@@ -145,6 +145,14 @@ public class AdminController(
         catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
     }
 
+    public record PayPassRequest(string? Method);
+    [HttpPost("passes/{id:guid}/pay")]
+    public async Task<IActionResult> PayPass(Guid id, [FromBody] PayPassRequest? req, CancellationToken ct)
+    {
+        try { return Ok(new { id = await billing.PayPassAsync(id, req?.Method, me.UserIdOrThrow(), ct) }); }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
     // ---- Pagos ----
     [HttpPost("payments")]
     public async Task<IActionResult> RegisterPayment([FromBody] RegisterPaymentInput input, CancellationToken ct)
