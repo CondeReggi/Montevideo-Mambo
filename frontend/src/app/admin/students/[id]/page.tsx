@@ -24,7 +24,7 @@ import { Shell } from "@/components/ui/TopBar";
 import { Card, Stat, Button, Field, Avatar, Badge, Skeleton } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { useDialog } from "@/components/ui/Dialog";
-import { PassBadge, StatusBadge, fmtDate, kindLabel } from "@/components/format";
+import { PassBadge, StatusBadge, fmtDate, kindLabel, debtDisplay } from "@/components/format";
 import { IconArrowLeft, IconTicket, IconCash, IconCalendar, IconPlus, IconCheck, IconQr } from "@/components/ui/Icons";
 import StudentQr from "@/components/StudentQr";
 import AlertsBanner, { criticalPassIds } from "@/components/AlertsBanner";
@@ -177,7 +177,8 @@ export default function StudentDetailPage() {
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {row && !row.isActive && <Badge tone="red">Dado de baja</Badge>}
                 {panel.summary.hasActiveUnlimited && <Badge tone="lime">Pase libre</Badge>}
-                {panel.summary.debtClasses > 0 && <Badge tone="red">Debe {panel.summary.debtClasses}</Badge>}
+                {panel.summary.debtMoney > 0 && <Badge tone="red">Debe ${panel.summary.debtMoney}</Badge>}
+                {panel.summary.debtClasses > 0 && <Badge tone="red">Debe {panel.summary.debtClasses} clase(s)</Badge>}
                 {panel.summary.pendingAttendances > 0 && (
                   <Badge tone="amber">{panel.summary.pendingAttendances} pendiente(s)</Badge>
                 )}
@@ -228,7 +229,10 @@ export default function StudentDetailPage() {
           <div className="mb-5 grid grid-cols-3 gap-3">
             <Stat label="Clases restantes" value={panel.summary.hasActiveUnlimited ? "∞" : panel.summary.classesRemaining} tone="lime" />
             <Stat label="Pendientes" value={panel.summary.pendingAttendances} tone="amber" />
-            <Stat label="Deuda" value={panel.summary.debtClasses} tone={panel.summary.debtClasses > 0 ? "red" : "default"} />
+            {(() => {
+              const d = debtDisplay(panel.summary);
+              return <Stat label="Deuda" value={d.value} hint={d.hint} tone={d.tone} />;
+            })()}
           </div>
 
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">

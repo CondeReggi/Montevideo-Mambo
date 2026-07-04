@@ -12,7 +12,8 @@ public record StudentSummary(
     int ClassesRemaining,
     bool HasActiveUnlimited,
     int DebtClasses,
-    int PendingAttendances);
+    int PendingAttendances,
+    decimal DebtMoney);
 
 /// <summary>
 /// Construye el resumen de saldo/estado de un alumno. Se usa para:
@@ -33,8 +34,11 @@ public class StudentSummaryService(IMamboDbContext db, IPhotoStorage photos, ICl
         var today = clock.LocalToday();
         var passes = await db.Passes
             .Where(p => p.StudentId == studentId)
-            .Select(p => new { p.Kind, p.Status, p.Balance, p.ValidFrom, p.ValidTo })
+            .Select(p => new { p.Kind, p.Status, p.Balance, p.ValidFrom, p.ValidTo, p.IsPaid, Price = p.PassType.Price })
             .ToListAsync(ct);
+
+        // Deuda de DINERO: cuponeras entregadas sin pagar (no canceladas).
+        var debtMoney = passes.Where(p => !p.IsPaid && p.Status != PassStatus.Cancelled).Sum(p => p.Price);
 
         var classesRemaining = passes
             .Where(p => p.Kind == PassKind.ClassPack && p.Status == PassStatus.Active
@@ -57,6 +61,6 @@ public class StudentSummaryService(IMamboDbContext db, IPhotoStorage photos, ICl
         var photoUrl = await photos.GetReadSignedUrlAsync(student.PhotoPath, ct: ct);
 
         return new StudentSummary(student.Id, student.FullName, photoUrl,
-            classesRemaining, hasUnlimited, negativeBalances + uncovered, pending);
+            classesRemaining, hasUnlimited, negativeBalances + uncovered, pending, debtMoney);
     }
 }

@@ -44,6 +44,7 @@ export interface StudentSummary {
   hasActiveUnlimited: boolean;
   debtClasses: number;
   pendingAttendances: number;
+  debtMoney: number;
 }
 
 export interface CheckInResult {
@@ -227,7 +228,7 @@ export interface PassType {
   id: string; name: string; kind: string; classCount: number | null; price: number; validityDays: number;
 }
 export interface Debtor {
-  studentId: string; fullName: string; debtClasses: number; pendingAttendances: number; classesRemaining: number;
+  studentId: string; fullName: string; debtClasses: number; pendingAttendances: number; classesRemaining: number; debtMoney: number;
 }
 
 export const getStudentDetail = (id: string) => api<StudentPanel>(`/api/admin/students/${id}`);

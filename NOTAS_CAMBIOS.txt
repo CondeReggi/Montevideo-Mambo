@@ -904,6 +904,22 @@ FIX [F6] enum.ToString() en Selects traducidos a SQL: en Postgres devolvía la
       ToListAsync) en StudentPanelService, BillingService.ListPassTypes y
       AlertsService. Verificado en Supabase: kinds PascalCase + avisos OK.
 
+--------------------------------------------------------------------------
+2026-07-03 — Deuda de DINERO (cuponeras impagas) visible en todos lados
+--------------------------------------------------------------------------
+[E34] Hasta ahora la "Deuda" sólo mostraba CLASES adeudadas; la plata de una
+      cuponera entregada sin pagar no aparecía. Ahora:
+      - StudentSummary suma DebtMoney = precio de las cuponeras impagas (no
+        canceladas). DebtorDto suma DebtMoney; ListDebtors incluye también a los
+        que sólo deben plata (antes filtraba por deuda de clases).
+      - UI: helper debtDisplay() muestra la deuda de plata ($) y las clases juntas.
+        Tile "Deuda" en /me y ficha; badges "Debe $X" en la ficha, en StudentCard
+        (lo que ve el profe/recepción) y en la lista de morosos; métrica "Deuda" y
+        preview de morosos del dashboard con el monto. Frontend StudentSummary y
+        Debtor suman debtMoney.
+      Verificado en Supabase: cuponera impaga -> summary.debtMoney=$1200 y aparece
+      en morosos aunque no deba clases.
+
 ==========================================================================
  (Agregar nuevas entradas debajo, en orden cronológico)
 ==========================================================================

@@ -10,7 +10,7 @@ import { Shell, PageHeader } from "@/components/ui/TopBar";
 import { Card, Stat, Badge, Button, Skeleton, Avatar } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { IconTicket, IconCalendar, IconCash, IconQr, IconCamera, IconClock, IconX } from "@/components/ui/Icons";
-import { PassBadge, StatusBadge, fmtDate, kindLabel } from "@/components/format";
+import { PassBadge, StatusBadge, fmtDate, kindLabel, debtDisplay } from "@/components/format";
 import StudentQr from "@/components/StudentQr";
 import QrScanner from "@/components/QrScanner";
 import AlertsBanner, { criticalPassIds, warnPassIds } from "@/components/AlertsBanner";
@@ -100,11 +100,10 @@ export default function MyPanel() {
               icon={<IconTicket />}
             />
             <Stat label="Pendientes" value={panel.summary.pendingAttendances} tone="amber" />
-            <Stat
-              label="Deuda"
-              value={panel.summary.debtClasses}
-              tone={panel.summary.debtClasses > 0 ? "red" : "default"}
-            />
+            {(() => {
+              const d = debtDisplay(panel.summary);
+              return <Stat label="Deuda" value={d.value} hint={d.hint} tone={d.tone} />;
+            })()}
           </div>
 
           {/* Marcar asistencia (Modo B: escaneo el QR de la clase) */}

@@ -22,6 +22,23 @@ export const WEEKDAYS = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "
 export const kindLabel = (k: string) => KIND_ES[k] ?? k;
 export const statusLabel = (s: string) => STATUS_ES[s] ?? s;
 
+/** Deuda del alumno para un tile "Deuda": muestra la PLATA (cuponeras impagas) y las
+ * clases adeudadas juntas. */
+export function debtDisplay(s: { debtMoney: number; debtClasses: number }): {
+  value: string | number;
+  hint?: string;
+  tone: "red" | "default";
+} {
+  const money = s.debtMoney ?? 0;
+  const cls = s.debtClasses ?? 0;
+  const has = money > 0 || cls > 0;
+  return {
+    value: money > 0 ? `$${money}` : cls,
+    hint: money > 0 && cls > 0 ? `+ ${cls} clase(s)` : money === 0 && cls > 0 ? "en clases" : undefined,
+    tone: has ? "red" : "default",
+  };
+}
+
 /** Formatea una fecha ISO (yyyy-mm-dd o completa) al formato uruguayo. */
 export function fmtDate(iso: string): string {
   try {

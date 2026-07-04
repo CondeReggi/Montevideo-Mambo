@@ -26,7 +26,8 @@ export default function StudentCard({
               {student.classesRemaining} clase{student.classesRemaining === 1 ? "" : "s"}
             </Badge>
           )}
-          {student.debtClasses > 0 && <Badge tone="red">Debe {student.debtClasses}</Badge>}
+          {student.debtMoney > 0 && <Badge tone="red">Debe ${student.debtMoney}</Badge>}
+          {student.debtClasses > 0 && <Badge tone="red">Debe {student.debtClasses} clase(s)</Badge>}
           {student.pendingAttendances > 0 && (
             <Badge tone="amber">{student.pendingAttendances} pendiente(s)</Badge>
           )}

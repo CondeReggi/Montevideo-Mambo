@@ -189,7 +189,10 @@ export default function AdminPayments() {
                     {d.classesRemaining} disponible(s) · {d.pendingAttendances} pendiente(s)
                   </p>
                 </div>
-                <Badge tone="red">Debe {d.debtClasses}</Badge>
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  {d.debtMoney > 0 && <Badge tone="red">Debe ${d.debtMoney}</Badge>}
+                  {d.debtClasses > 0 && <Badge tone="red">{d.debtClasses} clase(s)</Badge>}
+                </div>
                 <span className="text-muted-dim">
                   <IconChevron />
                 </span>

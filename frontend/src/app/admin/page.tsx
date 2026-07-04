@@ -58,6 +58,7 @@ export default function AdminHome() {
 
   const pendingToday = today?.reduce((a, s) => a + s.pendingCount, 0) ?? 0;
   const totalDebt = debtors?.reduce((a, d) => a + d.debtClasses, 0) ?? 0;
+  const totalDebtMoney = debtors?.reduce((a, d) => a + d.debtMoney, 0) ?? 0;
 
   const loadHorarios = async () => {
     setBusy(true);
@@ -112,7 +113,13 @@ export default function AdminHome() {
             <Stat label="Alumnos" value={students.length} icon={<IconUsers />} />
             <Stat label="Clases" value={classes?.length ?? 0} icon={<IconCalendar />} />
             <Stat label="Pendientes hoy" value={pendingToday} tone={pendingToday > 0 ? "amber" : "default"} icon={<IconAlert />} />
-            <Stat label="Deuda (clases)" value={totalDebt} tone={totalDebt > 0 ? "red" : "default"} icon={<IconTrend />} />
+            <Stat
+              label="Deuda"
+              value={totalDebtMoney > 0 ? `$${totalDebtMoney}` : totalDebt}
+              hint={totalDebtMoney > 0 && totalDebt > 0 ? `+ ${totalDebt} clase(s)` : totalDebtMoney === 0 && totalDebt > 0 ? "en clases" : undefined}
+              tone={totalDebtMoney > 0 || totalDebt > 0 ? "red" : "default"}
+              icon={<IconTrend />}
+            />
           </>
         )}
       </div>
@@ -177,8 +184,11 @@ export default function AdminHome() {
                 href={`/admin/students/${d.studentId}`}
                 className="flex items-center justify-between py-2.5 transition hover:text-lime"
               >
-                <span className="text-sm font-medium">{d.fullName}</span>
-                <span className="chip-red">Debe {d.debtClasses}</span>
+                <span className="truncate text-sm font-medium">{d.fullName}</span>
+                <span className="flex shrink-0 gap-1.5">
+                  {d.debtMoney > 0 && <span className="chip-red">Debe ${d.debtMoney}</span>}
+                  {d.debtClasses > 0 && <span className="chip-red">{d.debtClasses} clase(s)</span>}
+                </span>
               </Link>
             ))}
           </div>

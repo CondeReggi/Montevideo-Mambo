@@ -9,7 +9,7 @@ public record PassTypeDto(Guid Id, string Name, string Kind, int? ClassCount, de
 public record AssignPassInput(Guid StudentId, Guid PassTypeId, bool RegisterPayment, string? PaymentMethod);
 public record ExtendPassInput(int ExtraDays, int ExtraClasses, string? Reason);
 public record RegisterPaymentInput(Guid StudentId, decimal Amount, string Method, string? Concept, Guid? PassId, bool Confirmed);
-public record DebtorDto(Guid StudentId, string FullName, int DebtClasses, int PendingAttendances, int ClassesRemaining);
+public record DebtorDto(Guid StudentId, string FullName, int DebtClasses, int PendingAttendances, int ClassesRemaining, decimal DebtMoney);
 public record PendingPaymentDto(Guid Id, Guid StudentId, string FullName, decimal Amount, string Method, string? Concept, DateTime CreatedAt);
 
 /// <summary>
@@ -274,7 +274,16 @@ public class BillingService(IMamboDbContext db, IClock clock, IAuditService audi
             .GroupBy(p => p.StudentId).Select(g => new { StudentId = g.Key, Rem = g.Sum(p => p.Balance) })
             .ToListAsync(ct);
 
-        var debtorIds = neg.Select(x => x.StudentId).Union(uncovered.Select(x => x.StudentId)).Distinct().ToList();
+        // Deuda de dinero: cuponeras impagas (no canceladas) por alumno.
+        var money = await db.Passes
+            .Where(p => !p.IsPaid && p.Status != PassStatus.Cancelled)
+            .GroupBy(p => p.StudentId).Select(g => new { StudentId = g.Key, Amount = g.Sum(p => p.PassType.Price) })
+            .ToListAsync(ct);
+
+        var debtorIds = neg.Select(x => x.StudentId)
+            .Union(uncovered.Select(x => x.StudentId))
+            .Union(money.Select(x => x.StudentId))
+            .Distinct().ToList();
         if (debtorIds.Count == 0) return [];
 
         var names = await db.Students.Where(s => debtorIds.Contains(s.Id))
@@ -284,12 +293,15 @@ public class BillingService(IMamboDbContext db, IClock clock, IAuditService audi
         {
             var debt = (neg.FirstOrDefault(x => x.StudentId == s.Id)?.Debt ?? 0)
                        + (uncovered.FirstOrDefault(x => x.StudentId == s.Id)?.Cnt ?? 0);
+            var debtMoney = money.FirstOrDefault(x => x.StudentId == s.Id)?.Amount ?? 0m;
             return new DebtorDto(s.Id, s.FullName, debt,
                 pending.FirstOrDefault(x => x.StudentId == s.Id)?.Cnt ?? 0,
-                remaining.FirstOrDefault(x => x.StudentId == s.Id)?.Rem ?? 0);
+                remaining.FirstOrDefault(x => x.StudentId == s.Id)?.Rem ?? 0,
+                debtMoney);
         })
-        .Where(d => d.DebtClasses > 0)
-        .OrderByDescending(d => d.DebtClasses)
+        .Where(d => d.DebtClasses > 0 || d.DebtMoney > 0)
+        .OrderByDescending(d => d.DebtMoney)
+        .ThenByDescending(d => d.DebtClasses)
         .ToList();
     }
 }
