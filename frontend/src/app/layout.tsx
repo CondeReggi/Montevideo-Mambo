@@ -20,12 +20,12 @@ const sans = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Montevideo MAMBO — Gestión de la academia",
+  title: "Montevideo Mambo",
   description:
     "Bailá, conectá, disfrutá. Gestión de clases, asistencias por QR, cuponeras y pagos.",
   manifest: "/manifest.json",
-  applicationName: "Montevideo MAMBO",
-  appleWebApp: { capable: true, title: "MAMBO", statusBarStyle: "black-translucent" },
+  applicationName: "Montevideo Mambo",
+  appleWebApp: { capable: true, title: "Montevideo Mambo", statusBarStyle: "black-translucent" },
   icons: {
     icon: [
       { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
@@ -50,6 +50,28 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="es" className="dark">
+      <head>
+        {/* Captura el evento de instalación PWA APENAS carga la página (antes que React),
+            así el botón "Instalar app" puede lanzar el diálogo nativo con un toque en
+            Android/Chrome sin ir a "Compartir". */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){
+              window.__mamboBIP = null;
+              window.addEventListener('beforeinstallprompt', function(e){
+                e.preventDefault();
+                window.__mamboBIP = e;
+                window.dispatchEvent(new Event('mambo-bip'));
+              });
+              window.addEventListener('appinstalled', function(){
+                window.__mamboBIP = null;
+                window.__mamboInstalled = true;
+                window.dispatchEvent(new Event('mambo-installed'));
+              });
+            })();`,
+          }}
+        />
+      </head>
       <body className={`${display.variable} ${sans.variable} antialiased`}>
         <RefreshProvider>
           <ToastProvider>

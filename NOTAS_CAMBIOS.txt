@@ -73,6 +73,14 @@
 [x] Guard por rol estricto en /checkin (y /teacher, /teacher/session, /display) —
     useAuth acepta una lista de roles; estas páginas exigen admin|teacher en el
     cliente (un alumno es redirigido a /). (2026-07-03) Ver [E26].
+[ ] Pull-to-refresh SÓLO sobre el CONTENIDO, no sobre toda la página: el navbar
+    de arriba debe quedar FIJO y lo que scrollea/overflow (y desde donde se tira
+    para actualizar) es únicamente el área de contenido. Hoy el gesto es sobre la
+    ventana entera (el header es sticky pero participa del scroll). (pedido 2026-07-03)
+[ ] Confirmar antes de CERRAR SESIÓN (modal "¿Seguro?"): en móvil el botón de
+    cerrar el toast/notificación queda en el mismo lugar que el de cerrar sesión,
+    y un mistap desloguea sin querer. Agregar confirmación al logout (y/o separar
+    los botones). (pedido 2026-07-03)
 
 --- AUTENTICACIÓN / INFRA ------------------------------------------------
 [ ] Migrar / sumar Supabase Auth (hoy auth propia con JWT — decisión D15).
@@ -935,6 +943,22 @@ FIX [F6] enum.ToString() en Selects traducidos a SQL: en Postgres devolvía la
         /teacher, /teacher/session/[id], /me, /display. (/checkin y /settings no
         tienen datos que recargar.)
       Verificado: emulando el gesto en /admin dispara las 5 recargas de datos. ✅
+
+--------------------------------------------------------------------------
+2026-07-03 — Instalación PWA de 1 toque + nombre "Montevideo Mambo"
+--------------------------------------------------------------------------
+[E36] INSTALAR SIN "COMPARTIR" (Android): el evento beforeinstallprompt de Chrome
+      se dispara antes de que monte React y se perdía → el botón caía a instrucciones.
+      Ahora se captura en un <script> del <head> (layout) apenas carga la página,
+      se guarda en window.__mamboBIP, y usePwaInstall lo lee (+ escucha por si llega
+      después). Resultado: en Android el botón "Instalar app" abre el diálogo NATIVO
+      con UN toque. Verificado (headless): al tocar se llama a prompt() nativo.
+      NOTA: en iOS (iPhone) sigue siendo manual — Apple NO permite instalar por código;
+      sólo Compartir → Agregar a inicio (mostramos instrucciones).
+      Requisitos en prod OK: manifest, sw.js e íconos servidos (200) + HTTPS.
+[E37] Nombre de la app = "Montevideo Mambo" (antes "Montevideo MAMBO — Gestión de
+      la academia"). Cambiado en manifest (name/short_name) y metadata (title,
+      applicationName, appleWebApp.title). El wordmark visual "MAMBO" del logo queda igual.
 
 ==========================================================================
  (Agregar nuevas entradas debajo, en orden cronológico)

@@ -1,6 +1,6 @@
 {
-  "name": "Montevideo MAMBO — Gestión de la academia",
-  "short_name": "MAMBO",
+  "name": "Montevideo Mambo",
+  "short_name": "Montevideo Mambo",
   "description": "Bailá, conectá, disfrutá. Clases, asistencias por QR, cuponeras y pagos.",
   "start_url": "/",
   "display": "standalone",
