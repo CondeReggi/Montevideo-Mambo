@@ -30,7 +30,7 @@ public class StudentSummaryService(IMamboDbContext db, IPhotoStorage photos, ICl
             .FirstOrDefaultAsync(ct);
         if (student is null) return null;
 
-        var today = DateOnly.FromDateTime(clock.UtcNow);
+        var today = clock.LocalToday();
         var passes = await db.Passes
             .Where(p => p.StudentId == studentId)
             .Select(p => new { p.Kind, p.Status, p.Balance, p.ValidFrom, p.ValidTo })

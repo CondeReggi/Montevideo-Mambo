@@ -41,7 +41,7 @@ public class StudentPanelService(IMamboDbContext db, StudentSummaryService summa
             .ToListAsync(ct);
 
         // Avisos/recordatorios: cuponeras por vencer, última clase y deuda.
-        var today = DateOnly.FromDateTime(clock.UtcNow);
+        var today = clock.LocalToday();
         var alerts = passes
             .SelectMany(p => PassAlerts.ForPass(p.Id, p.Kind, p.Balance, p.ValidTo, p.Status, today))
             .ToList();

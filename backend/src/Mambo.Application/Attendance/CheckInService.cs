@@ -75,7 +75,7 @@ public class CheckInService(IMamboDbContext db, IClock clock)
     public async Task<CheckInResult> RegisterAsync(Guid studentId, AttendanceSource source, CancellationToken ct = default)
     {
         var now = clock.UtcNow;
-        var today = DateOnly.FromDateTime(now);
+        var today = clock.LocalToday();
 
         // Sesiones de hoy no canceladas (la grilla del día).
         var sessions = await db.Sessions

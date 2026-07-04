@@ -31,7 +31,7 @@ public class SessionsController(
     [HttpGet("today")]
     public async Task<IActionResult> Today(CancellationToken ct)
     {
-        var today = DateOnly.FromDateTime(clock.UtcNow);
+        var today = clock.LocalToday();
         var sessions = await db.Sessions
             .Where(s => s.SessionDate == today)
             .OrderBy(s => s.StartAt)

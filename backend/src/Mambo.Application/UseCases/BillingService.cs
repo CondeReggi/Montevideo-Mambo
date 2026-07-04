@@ -37,7 +37,7 @@ public class BillingService(IMamboDbContext db, IClock clock, IAuditService audi
         if (!await db.Students.AnyAsync(s => s.Id == i.StudentId, ct))
             throw new InvalidOperationException("Alumno no encontrado.");
 
-        var today = DateOnly.FromDateTime(clock.UtcNow);
+        var today = clock.LocalToday();
         var now = clock.UtcNow;
         var credit = type.Kind == PassKind.UnlimitedMonth ? 0 : (type.ClassCount ?? 1);
 
@@ -107,7 +107,7 @@ public class BillingService(IMamboDbContext db, IClock clock, IAuditService audi
         var pass = await db.Passes.FirstOrDefaultAsync(p => p.Id == passId, ct)
             ?? throw new InvalidOperationException("Cuponera no encontrada.");
         var now = clock.UtcNow;
-        var today = DateOnly.FromDateTime(now);
+        var today = clock.LocalToday();
 
         if (i.ExtraDays > 0)
         {
@@ -152,7 +152,7 @@ public class BillingService(IMamboDbContext db, IClock clock, IAuditService audi
             Status = i.Confirmed ? PaymentStatus.Confirmed : PaymentStatus.Pending,
             PassId = i.PassId,
             Concept = i.Concept,
-            PaidAt = i.Confirmed ? DateOnly.FromDateTime(now) : null,
+            PaidAt = i.Confirmed ? clock.LocalToday() : null,
             ConfirmedBy = i.Confirmed ? actor : null,
             CreatedAt = now,
             UpdatedAt = now
@@ -186,7 +186,7 @@ public class BillingService(IMamboDbContext db, IClock clock, IAuditService audi
 
         var now = clock.UtcNow;
         payment.Status = PaymentStatus.Confirmed;
-        payment.PaidAt = DateOnly.FromDateTime(now);
+        payment.PaidAt = clock.LocalToday();
         payment.ConfirmedBy = actor;
         payment.UpdatedAt = now;
 
@@ -218,7 +218,7 @@ public class BillingService(IMamboDbContext db, IClock clock, IAuditService audi
     /// <summary>Lista alumnos con deuda (saldos negativos + asistencias confirmadas no cubiertas, D12).</summary>
     public async Task<List<DebtorDto>> ListDebtorsAsync(CancellationToken ct = default)
     {
-        var today = DateOnly.FromDateTime(clock.UtcNow);
+        var today = clock.LocalToday();
 
         var neg = await db.Passes.Where(p => p.Balance < 0)
             .GroupBy(p => p.StudentId)

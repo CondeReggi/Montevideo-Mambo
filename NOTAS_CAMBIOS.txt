@@ -823,6 +823,22 @@ FIX (bug real que SQLite ocultaba):
            Postgres. En Supabase se resolvió además desactivando la clase demo
            (la restricción sólo aplica a is_active), y así entró la grilla (23).
 
+--------------------------------------------------------------------------
+2026-07-03 — Paquete de despliegue gratis (Vercel + Render + Supabase)
+--------------------------------------------------------------------------
+[E31] Todo listo para publicar gratis:
+      - backend/Dockerfile (multi-stage .NET 8) + .dockerignore. Program.cs bindea
+        a la variable PORT (Render) sin afectar el local (usa ASPNETCORE_URLS).
+      - render.yaml (blueprint del Web Service Docker; secretos con sync:false).
+      - README-DEPLOY.md: runbook completo (GitHub → Render backend → Vercel front →
+        CORS → prueba), con cómo generar Jwt__Key/Qr__Secret y la connection string.
+      - Verificación posible en local: `dotnet publish -c Release` OK (build stage);
+        el `docker build/run` no se pudo (daemon apagado, headless) pero el runtime
+        contra Supabase ya se probó antes con `dotnet run` (login admin OK). El build
+        de la imagen ocurre en Render.
+      - Repo (ya existía en main): commit de toda la sesión + el paquete de deploy.
+        Sin secretos en el repo (la password de Supabase va como env var en Render).
+
 ==========================================================================
  (Agregar nuevas entradas debajo, en orden cronológico)
 ==========================================================================

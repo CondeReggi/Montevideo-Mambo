@@ -20,7 +20,7 @@ public class DevSeeder(IMamboDbContext db, IPasswordHasher hasher, IClock clock)
             return "Los datos demo ya existían.";
 
         var now = clock.UtcNow;
-        var today = DateOnly.FromDateTime(now);
+        var today = clock.LocalToday();
 
         await CreateUserAsync("admin@mambo.local", "Admin1234!", "Administrador Demo", 1, ct);
         var (_, teacher) = await CreateTeacherAsync("profe@mambo.local", "Profe1234!", "Profe Demo", ct);

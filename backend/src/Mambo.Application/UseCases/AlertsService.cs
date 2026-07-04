@@ -18,7 +18,7 @@ public class AlertsService(IMamboDbContext db, IClock clock)
     /// <summary>Alumnos con cuponera crítica/por vencer (usa las mismas reglas que el alumno).</summary>
     public async Task<List<StudentRiskDto>> ListStudentsAtRiskAsync(CancellationToken ct = default)
     {
-        var today = DateOnly.FromDateTime(clock.UtcNow);
+        var today = clock.LocalToday();
         var passes = await db.Passes
             .Where(p => p.Status == PassStatus.Active)
             .Select(p => new
