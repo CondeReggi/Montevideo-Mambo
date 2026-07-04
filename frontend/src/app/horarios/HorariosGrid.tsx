@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { getPublicSchedule } from "@/lib/api";
-import { IconPin, IconPhone, IconClock } from "@/components/ui/Icons";
+import { WD } from "@/lib/horarios";
+import { IconPin, IconPhone, IconClock, IconChevron } from "@/components/ui/Icons";
 
 // Grilla fija de marca (fallback si el backend no está disponible).
 const FALLBACK_TIMES = ["18:30", "19:30", "20:30", "21:30"];
@@ -20,7 +22,6 @@ const FALLBACK_SATURDAY = [
   { time: "16:00", name: "Salsa Princ.-Avanzados" },
 ];
 const COURSE_DATES = ["09/03", "11/05", "06/07", "07/09", "02/11"];
-const WD = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 
 interface Grid {
   times: string[];
@@ -63,33 +64,41 @@ export default function HorariosGrid() {
       .catch(() => {/* mantiene el fallback de marca */});
   }, []);
 
-  const cols = `grid-cols-[80px_repeat(${g.days.length},1fr)]`;
+  // gridTemplateColumns por style inline: Tailwind no genera clases construidas con
+  // interpolación, por eso la grilla dinámica no puede usar grid-cols-[...] armado en JS.
+  const colStyle = { gridTemplateColumns: `80px repeat(${g.days.length}, 1fr)` };
 
   return (
     <>
-      {/* Grilla semanal */}
+      {/* Grilla semanal (tocá un día para ver su detalle) */}
       <div className="scrollbar-thin overflow-x-auto animate-fade-up">
         <div className="min-w-[720px]">
-          <div className={`grid ${cols} gap-2`}>
+          <div className="grid gap-2" style={colStyle}>
             <div />
             {g.days.map((d) => (
-              <div key={d} className="rounded-xl bg-lime-grad py-2 text-center font-display text-sm tracking-wide text-ink-900">
+              <Link
+                key={d}
+                href={`/horarios/${WD.indexOf(d)}`}
+                className="group flex items-center justify-center gap-1 rounded-xl bg-lime-grad py-2 text-center font-display text-sm tracking-wide text-ink-900 transition hover:brightness-110"
+              >
                 {d}
-              </div>
+                <IconChevron className="text-ink-900/70 transition group-hover:translate-x-0.5" />
+              </Link>
             ))}
           </div>
           {g.times.map((t) => (
-            <div key={t} className={`mt-2 grid ${cols} gap-2`}>
+            <div key={t} className="mt-2 grid gap-2" style={colStyle}>
               <div className="grid place-items-center rounded-xl border border-ink-500 bg-ink-800 font-display text-sm text-lime">
                 {t}
               </div>
               {g.days.map((d) => (
-                <div
+                <Link
                   key={d + t}
-                  className="flex items-center justify-center rounded-xl border border-ink-500/70 bg-ink-800/80 px-2 py-3 text-center text-xs font-medium text-foreground transition hover:border-lime/40"
+                  href={`/horarios/${WD.indexOf(d)}`}
+                  className="flex items-center justify-center rounded-xl border border-ink-500/70 bg-ink-800/80 px-2 py-3 text-center text-xs font-medium text-foreground transition hover:border-lime/40 hover:bg-ink-700/60"
                 >
                   {g.grid[d]?.[t] ?? ""}
-                </div>
+                </Link>
               ))}
             </div>
           ))}
@@ -99,15 +108,17 @@ export default function HorariosGrid() {
       {/* Sábado + cursos */}
       <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-[1fr_2fr]">
         <div className="card p-5 animate-fade-up">
-          <h2 className="mb-3 font-display text-xl tracking-wide text-lime">Sábado</h2>
+          <Link href="/horarios/6" className="group mb-3 inline-flex items-center gap-1.5 font-display text-xl tracking-wide text-lime transition hover:brightness-110">
+            Sábado <IconChevron className="transition group-hover:translate-x-0.5" />
+          </Link>
           <div className="space-y-2">
             {g.saturday.map((s) => (
-              <div key={s.time + s.name} className="flex items-center gap-3 rounded-xl border border-ink-500/60 bg-ink-900/40 p-3">
+              <Link key={s.time + s.name} href="/horarios/6" className="flex items-center gap-3 rounded-xl border border-ink-500/60 bg-ink-900/40 p-3 transition hover:border-lime/40">
                 <span className="grid h-10 w-14 shrink-0 place-items-center rounded-lg bg-lime/15 font-display text-sm text-lime">
                   {s.time}
                 </span>
                 <span className="text-sm font-medium">{s.name}</span>
-              </div>
+              </Link>
             ))}
           </div>
         </div>
