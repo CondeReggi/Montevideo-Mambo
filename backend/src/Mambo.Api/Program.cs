@@ -1,7 +1,10 @@
+using System.Threading.RateLimiting;
 using Mambo.Api.Auth;
 using Mambo.Infrastructure;
 using Mambo.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -89,6 +92,34 @@ builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
     p.WithOrigins(builder.Configuration["Cors:Origins"]?.Split(';') ?? ["http://localhost:3000"])
      .AllowAnyHeader().AllowAnyMethod()));
 
+// SEC-05: detrás del proxy de Render el request llega por HTTP con el esquema/IP originales
+// en cabeceras X-Forwarded-*. Confiamos en el proxy de la plataforma (red dinámica → limpiamos
+// las listas de proxies conocidos). Esto además da la IP real para el rate limiting (SEC-07).
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
+// SEC-07: rate limiting para frenar fuerza bruta / credential stuffing en el login.
+// Ventana fija por IP: 20 intentos cada 5 minutos; el excedente recibe 429.
+// (Se elige 20 y no 10 porque el personal comparte la IP del wifi de la academia; 20/5min
+// sigue haciendo inviable la fuerza bruta sin bloquear a usuarios legítimos que se equivocan.)
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("auth", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 20,
+                Window = TimeSpan.FromMinutes(5),
+                QueueLimit = 0,
+            }));
+});
+
 var app = builder.Build();
 
 // Desarrollo sin Docker: si el proveedor es SQLite, crear el esquema al arrancar.
@@ -99,13 +130,24 @@ using (var scope = app.Services.CreateScope())
         db.Database.EnsureCreated();
 }
 
+// SEC-05: primero interpretar X-Forwarded-* para conocer esquema/IP reales.
+app.UseForwardedHeaders();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+else
+{
+    // SEC-05: HSTS (el TLS lo termina el borde de Render; esto instruye al navegador
+    // a usar siempre HTTPS). No se usa UseHttpsRedirection para no romper el health-check
+    // interno por HTTP ni generar bucles de redirección detrás del proxy.
+    app.UseHsts();
+}
 
 app.UseCors();
+app.UseRateLimiter();   // SEC-07
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

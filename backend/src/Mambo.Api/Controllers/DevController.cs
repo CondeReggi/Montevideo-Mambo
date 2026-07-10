@@ -1,10 +1,15 @@
+// SEC-09: el controlador de seed SOLO se compila en Debug. En el build de producción
+// (Dockerfile → Release) esta clase NO existe, así que el endpoint /api/dev/* no puede
+// alcanzarse ni por una mala config de ASPNETCORE_ENVIRONMENT. El chequeo IsDevelopment()
+// de abajo es una segunda barrera (defensa en profundidad) para builds Debug.
+#if DEBUG
 using Mambo.Application.UseCases;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Mambo.Api.Controllers;
 
-/// <summary>Utilidades de desarrollo. Disponible solo en entorno Development.</summary>
+/// <summary>Utilidades de desarrollo. Disponible solo en entorno Development y build Debug.</summary>
 [ApiController]
 [Route("api/dev")]
 [AllowAnonymous]
@@ -30,3 +35,4 @@ public class DevController(DevSeeder seeder, IWebHostEnvironment env) : Controll
         return Ok(new { message });
     }
 }
+#endif

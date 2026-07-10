@@ -1,6 +1,7 @@
 using Mambo.Application.UseCases;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Mambo.Api.Controllers;
 
@@ -14,6 +15,7 @@ public class AuthController(AuthService auth) : ControllerBase
     /// <summary>Login por email + contraseña. Devuelve access JWT + refresh token y los roles.</summary>
     [HttpPost("login")]
     [AllowAnonymous]
+    [EnableRateLimiting("auth")]   // SEC-07: frena fuerza bruta (10 intentos/5 min por IP)
     public async Task<IActionResult> Login([FromBody] LoginRequest req, CancellationToken ct)
     {
         try { return Ok(await auth.LoginAsync(req.Email, req.Password, ct)); }

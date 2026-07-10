@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { Anton, Inter } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
@@ -48,6 +49,8 @@ export const viewport = {
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  // Nonce de CSP inyectado por middleware.ts (SEC-21): habilita este único script inline.
+  const nonce = headers().get("x-nonce") ?? undefined;
   return (
     <html lang="es" className="dark">
       <head>
@@ -55,6 +58,7 @@ export default function RootLayout({
             así el botón "Instalar app" puede lanzar el diálogo nativo con un toque en
             Android/Chrome sin ir a "Compartir". */}
         <script
+          nonce={nonce}
           dangerouslySetInnerHTML={{
             __html: `(function(){
               window.__mamboBIP = null;

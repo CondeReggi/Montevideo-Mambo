@@ -1039,3 +1039,48 @@ FIX [F6] enum.ToString() en Selects traducidos a SQL: en Postgres devolvía la
       autenticado 200; refresh rota (par nuevo distinto); reuso del refresh viejo→401 y
       corta la cadena; logout→204 y refresh posterior→401; logout idempotente→204;
       token basura→401 (no 500). Tabla refresh_token creada sin errores.
+
+--------------------------------------------------------------------------
+2026-07-10 — Endurecimiento: HTTPS/HSTS, rate limiting y seed (SEC-05/07/09)
+--------------------------------------------------------------------------
+[E41] SEC-05 (HTTPS/HSTS): UseForwardedHeaders (X-Forwarded-Proto/For) para conocer
+      esquema/IP reales detras del proxy de Render + UseHsts() en produccion. NO se
+      usa UseHttpsRedirection (Render fuerza HTTPS en el borde; a nivel app romperia
+      el health-check HTTP y podria hacer bucles). Los forwarded headers ademas dan
+      la IP real para el rate limiting.
+[E42] SEC-07 (rate limiting): AddRateLimiter con politica "auth" (ventana fija por IP,
+      20 intentos / 5 min, excedente -> 429) aplicada a POST /api/auth/login con
+      [EnableRateLimiting("auth")]. Se eligio 20 (no 10) por la IP compartida del wifi
+      de la academia. VERIFICADO: con limite 10 de prueba, intentos 11-12 dieron 429;
+      subido luego a 20. Mejora futura: particion/bloqueo por email + log de fallidos.
+[E43] SEC-09 (blindar seed): DevController envuelto en #if DEBUG. El Dockerfile publica
+      en Release, asi que en produccion la clase NO existe en el binario (endpoint
+      /api/dev/* inalcanzable, no depende de ASPNETCORE_ENVIRONMENT). Se mantiene el
+      chequeo IsDevelopment() como segunda barrera. VERIFICADO: en dev (Debug) el seed
+      sigue 200.
+
+--------------------------------------------------------------------------
+2026-07-10 — CSP estricta + cabeceras de seguridad (SEC-21, mitiga SEC-06)
+--------------------------------------------------------------------------
+[E44] DECISION SEC-06: front (Vercel) y back (Render) estan en dominios distintos,
+      asi que migrar a cookie HttpOnly seria cross-site (SameSite=None + CSRF) y solo
+      se valida 100% en prod (riesgo de romper login). Se opto por MITIGAR el robo de
+      token con CSP estricta en vez de migrar ahora. La migracion a cookie queda
+      recomendada para cuando haya dominio propio (cookies same-site).
+[E45] SEC-21 (CSP + headers): nuevo frontend/src/middleware.ts que emite Content-
+      Security-Policy con NONCE por request (script-src 'self' 'nonce-...' 'strict-
+      dynamic', SIN 'unsafe-inline' para scripts) + X-Content-Type-Options nosniff,
+      Referrer-Policy strict-origin-when-cross-origin, X-Frame-Options DENY,
+      Permissions-Policy (camara solo self), frame-ancestors 'none'. El nonce se aplica
+      al <script> inline de PWA (layout.tsx lee headers()->x-nonce) y Next.js lo propaga
+      a sus scripts. connect-src/img-src se arman desde NEXT_PUBLIC_API_URL y
+      NEXT_PUBLIC_SUPABASE_URL. Efecto: un XSS no puede ejecutar script inyectado -> no
+      puede robar el token de localStorage (mitiga SEC-06; el token sigue en localStorage).
+      NOTA: leer headers() en el layout raiz vuelve DINAMICAS todas las rutas (se pierde
+      el cacheo estatico de las publicas); aceptable para esta app.
+      NOTA DESPLIEGUE (Vercel): NEXT_PUBLIC_API_URL debe estar seteada (ya lo esta) o el
+      connect-src bloquearia las llamadas al backend. Si se usan fotos de alumnos
+      (Supabase Storage), setear NEXT_PUBLIC_SUPABASE_URL o el img-src bloquearia esas
+      imagenes (las iniciales/avatares sin foto no se afectan).
+      VERIFICADO: build front OK; cabecera CSP con nonce; 15/15 <script> con nonce (la
+      app hidrata); cabeceras de seguridad presentes.

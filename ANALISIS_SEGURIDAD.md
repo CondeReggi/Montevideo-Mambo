@@ -25,11 +25,11 @@ recomendación. La severidad asume un despliegue **real, expuesto a internet** (
 | SEC-02 | 🔴 | `appsettings.Development.json` versionado con la clave JWT | ✅ Resuelto (2026-07-10) |
 | SEC-03 | 🔴 | Base SQLite (`mambo_dev.db`) con hashes de contraseñas commiteada | Pendiente |
 | SEC-04 | 🔴 | Secreto del QR (Modo B) reutiliza la clave JWT | ✅ Resuelto (2026-07-10) |
-| SEC-05 | 🟠 | Sin HTTPS forzado / HSTS: tokens Bearer viajan en claro | Pendiente |
-| SEC-06 | 🟠 | JWT guardado en `localStorage` (robo por XSS) | Pendiente |
-| SEC-07 | 🟠 | Login sin rate limiting ni bloqueo por intentos (fuerza bruta) | Pendiente |
+| SEC-05 | 🟠 | Sin HTTPS forzado / HSTS: tokens Bearer viajan en claro | ✅ Resuelto (2026-07-10) |
+| SEC-06 | 🟠 | JWT guardado en `localStorage` (robo por XSS) | 🟡 Mitigado vía CSP (SEC-21); cookie HttpOnly pendiente |
+| SEC-07 | 🟠 | Login sin rate limiting ni bloqueo por intentos (fuerza bruta) | ✅ Resuelto (2026-07-10) |
 | SEC-08 | 🟠 | Sin revocación de tokens / logout de servidor / refresh | ✅ Resuelto (2026-07-10) |
-| SEC-09 | 🟠 | `DevController` de seed depende solo de `IsDevelopment()` | Pendiente |
+| SEC-09 | 🟠 | `DevController` de seed depende solo de `IsDevelopment()` | ✅ Resuelto (2026-07-10) |
 | SEC-10 | 🟡 | CORS y `AllowedHosts` permisivos / frágiles ante mala config | Pendiente |
 | SEC-11 | 🟡 | Códigos QR fijos de alumno predecibles (`STU-ANA-001`) | Pendiente |
 | SEC-12 | 🟡 | Sin validación de entrada (email, política de contraseña, longitudes) | Pendiente |
@@ -41,7 +41,7 @@ recomendación. La severidad asume un despliegue **real, expuesto a internet** (
 | SEC-18 | 🔵 | Sin auditoría de eventos de auth (logins fallidos/exitosos) | Pendiente |
 | SEC-19 | 🔵 | Listados sin paginación (agotamiento de memoria a escala) | Pendiente |
 | SEC-20 | 🔵 | Esquema por `EnsureCreated`, sin migraciones versionadas | Pendiente |
-| SEC-21 | 🔵 | Sin cabeceras de seguridad HTTP ni límites de tamaño de payload | Pendiente |
+| SEC-21 | 🔵 | Sin cabeceras de seguridad HTTP ni límites de tamaño de payload | ✅ Resuelto (2026-07-10, CSP + headers) |
 | SEC-22 | 🔵 | Connection string de Postgres con credenciales en el repo | ✅ Resuelto (2026-07-10) |
 
 ---
@@ -115,6 +115,11 @@ recomendación. La severidad asume un despliegue **real, expuesto a internet** (
   en texto plano → interceptables (MITM en redes de la academia/WiFi). El JWT robado da acceso por 12h.
 - **Recomendación:** terminar TLS en el borde y, en la app, `app.UseHsts()` + `UseHttpsRedirection()` en
   producción; marcar cookies (si se migra a cookies) como `Secure`.
+- **✅ Resolución (2026-07-10):** se agregó `UseForwardedHeaders` (X-Forwarded-Proto/For) para que la app
+  conozca el esquema/IP reales detrás del proxy de Render, y `UseHsts()` en producción. **No** se usó
+  `UseHttpsRedirection` a propósito: Render ya fuerza HTTPS en el borde, y un redirect a nivel app
+  arriesga romper el health-check interno (HTTP) y generar bucles tras el proxy. Los forwarded headers
+  además habilitan el rate limiting por IP real (SEC-07).
 
 ### SEC-06 — JWT guardado en `localStorage` (robo por XSS)
 - **Ubicación:** `frontend/src/lib/auth.ts:17-38` (`localStorage.setItem("mambo.session", ...)`)
@@ -124,6 +129,13 @@ recomendación. La severidad asume un despliegue **real, expuesto a internet** (
 - **Recomendación:** preferir **cookie `HttpOnly` + `Secure` + `SameSite=Strict/Lax`** emitida por el
   backend. Si se mantiene el patrón SPA con Bearer, minimizar superficie XSS (CSP estricta, sanitización)
   y acortar la vida del token. Ver SEC-08 (rotación) y SEC-21 (CSP).
+- **🟡 Mitigación (2026-07-10):** en lugar de migrar a cookie (complejo y riesgoso por ser **cross-site**:
+  front en Vercel, back en Render → requeriría `SameSite=None` + CSRF), se optó por **reducir el vector
+  de robo**: **CSP estricta con nonce** (ver SEC-21) que impide ejecutar scripts inyectados por XSS, más
+  el hecho de que el access token ya es **corto (30 min)** tras SEC-08. El token sigue en `localStorage`,
+  así que **SEC-06 queda parcialmente abierto**: la migración a cookie `HttpOnly` es la solución completa
+  y se recomienda hacerla cuando el front y el back compartan un **dominio propio** (cookies same-site,
+  mucho más simple y seguro).
 
 ### SEC-07 — Login sin rate limiting ni bloqueo por intentos (fuerza bruta)
 - **Ubicación:** `backend/src/Mambo.Api/Controllers/AuthController.cs:14`, `AuthService.cs:12`
@@ -133,6 +145,11 @@ recomendación. La severidad asume un despliegue **real, expuesto a internet** (
 - **Recomendación:** aplicar **Rate Limiting** de ASP.NET Core (`AddRateLimiter`, política por IP y por
   email) en login; bloqueo temporal tras N fallos; considerar CAPTCHA tras varios intentos. Registrar
   intentos fallidos (SEC-18).
+- **✅ Resolución (2026-07-10):** `AddRateLimiter` con política `"auth"` (ventana fija por IP:
+  **20 intentos / 5 min**, excedente → **429**) aplicada a `POST /api/auth/login` vía
+  `[EnableRateLimiting("auth")]`. Verificado: los intentos por encima del límite devuelven 429.
+  Se eligió 20 (no 10) por la IP compartida del wifi de la academia. **Mejora futura:** sumar
+  partición/bloqueo por cuenta (email) y registro de intentos fallidos (SEC-18).
 
 ### SEC-08 — Sin revocación de tokens / logout de servidor / refresh
 - **Ubicación:** `JwtIssuer.cs` (JWT stateless, 12h), no hay lista de revocación ni refresh tokens
@@ -169,6 +186,10 @@ recomendación. La severidad asume un despliegue **real, expuesto a internet** (
 - **Recomendación:** excluir por completo el controller del build de producción (compilación condicional
   `#if DEBUG` o registrar el endpoint solo si `IsDevelopment()`), no depender de un `return NotFound()`
   en runtime. Nunca sembrar credenciales fijas en un entorno alcanzable.
+- **✅ Resolución (2026-07-10):** `DevController` quedó envuelto en `#if DEBUG`. El Dockerfile publica en
+  **Release**, así que en producción la clase **no existe** en el binario (el endpoint `/api/dev/*` es
+  inalcanzable, no depende de `ASPNETCORE_ENVIRONMENT`). Se mantiene el chequeo `IsDevelopment()` como
+  segunda barrera para builds Debug. Verificado: en dev (Debug) el seed sigue respondiendo 200.
 
 ---
 
@@ -270,6 +291,15 @@ recomendación. La severidad asume un despliegue **real, expuesto a internet** (
   payloads enormes pueden abusar recursos.
 - **Recomendación:** añadir cabeceras de seguridad (middleware o en el proxy), CSP estricta en el frontend,
   y `MaxRequestBodySize` razonable.
+- **✅ Resolución (2026-07-10):** nuevo `frontend/src/middleware.ts` que emite una **CSP estricta con
+  nonce por request** (`script-src 'self' 'nonce-…' 'strict-dynamic'`, sin `'unsafe-inline'` para
+  scripts) + `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`,
+  `X-Frame-Options: DENY`, `Permissions-Policy` (cámara solo self) y `frame-ancestors 'none'`. El nonce
+  se aplica al script inline de PWA (`layout.tsx`) y Next.js lo propaga a sus propios scripts.
+  Verificado: la cabecera CSP trae nonce, 15/15 `<script>` lo llevan (la app hidrata) y un script
+  inyectado sin nonce quedaría bloqueado. `connect-src`/`img-src` se arman desde `NEXT_PUBLIC_API_URL` y
+  `NEXT_PUBLIC_SUPABASE_URL` (ver nota de despliegue). **Pendiente menor:** `MaxRequestBodySize` en el
+  backend .NET (Kestrel ya trae un límite por defecto de 30 MB).
 
 ### SEC-22 — Connection string de Postgres con credenciales en el repo
 - **Ubicación:** `appsettings.Development.json:13` (`...Username=postgres;Password=postgres`)
