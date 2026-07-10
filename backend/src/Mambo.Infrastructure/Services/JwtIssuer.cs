@@ -3,20 +3,25 @@ using System.Security.Claims;
 using System.Text;
 using Mambo.Application.Abstractions;
 using Mambo.Domain.Entities;
-using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 
 namespace Mambo.Infrastructure.Services;
 
+/// <summary>
+/// Parámetros de firma/validación del JWT, ya resueltos en el arranque (fuente única de verdad).
+/// La clave NO tiene fallback inseguro: si falta en producción, el arranque falla (ver Program.cs).
+/// </summary>
+public record JwtOptions(string Key, string Issuer, string Audience, int ExpiresHours);
+
 /// <summary>Emite JWT propios (autenticación local). Compatible con la validación de Program.cs.</summary>
-public class JwtIssuer(IConfiguration config) : IJwtIssuer
+public class JwtIssuer(JwtOptions options) : IJwtIssuer
 {
     public IssuedToken Issue(AppUser user, IEnumerable<string> roles)
     {
-        var key = config["Jwt:Key"] ?? "dev-only-insecure-key-change-me-please-32+chars";
-        var issuer = config["Jwt:Issuer"] ?? "mambo";
-        var audience = config["Jwt:Audience"] ?? "mambo";
-        var hours = int.TryParse(config["Jwt:ExpiresHours"], out var h) ? h : 12;
+        var key = options.Key;
+        var issuer = options.Issuer;
+        var audience = options.Audience;
+        var hours = options.ExpiresHours;
 
         var claims = new List<Claim>
         {

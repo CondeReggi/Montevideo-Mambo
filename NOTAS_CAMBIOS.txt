@@ -99,6 +99,18 @@
   PRODUCTO
   [ ] App móvil NATIVA (React Native + Expo). Ver PLAN_MOBILE.txt. Es el bloque
       grande si se quiere publicar en tiendas (alumno/profe con tablet/celular).
+  [ ] (ALTERNATIVA a discutir) Publicar la PWA en Google Play como TWA
+      (Trusted Web Activity) con PWABuilder / Bubblewrap, usando el mismo sitio de
+      Vercel. Motivo: al instalar la PWA en algunos Android (viejos o con Chrome/
+      Play Services desactualizados) aparece el aviso "Se bloqueó la app / diseñada
+      para una versión anterior de Android / sin las protecciones de privacidad más
+      recientes". Eso pasa porque la WebAPK la genera Chrome y su targetSdk depende
+      del dispositivo (NO se arregla desde nuestro código). Con TWA en Play Store
+      controlamos el targetSdk y la firma → se instala sin advertencias en cualquier
+      Android. Requiere cuenta de Google Play Developer (US$25 pago único). Genera un
+      .aab firmado. Camino mucho más liviano que la app nativa (reusa el mismo front).
+      Workaround inmediato para el usuario: actualizar Chrome/Play Services/WebView y
+      reinstalar; o usarla desde el navegador sin instalar. (nota 2026-07-04)
   [x] CRUD de PROFESORES desde la UI — página /admin/teachers (alta, edición
       por modal, baja/alta) + endpoints PUT/active + nav y dashboard. (2026-07-03) [E26]
   [ ] Cancelar / anular cuponeras (hoy sólo se EXTIENDE; falta anular con su
@@ -963,3 +975,34 @@ FIX [F6] enum.ToString() en Selects traducidos a SQL: en Postgres devolvía la
 ==========================================================================
  (Agregar nuevas entradas debajo, en orden cronológico)
 ==========================================================================
+
+--------------------------------------------------------------------------
+2026-07-10 — Análisis de seguridad + endurecimiento de secretos (Grupo 1)
+--------------------------------------------------------------------------
+[E38] ANÁLISIS DE SEGURIDAD: se documentaron 22 hallazgos (críticos → robustez)
+      en ANALISIS_SEGURIDAD.md, con severidad, ubicación (archivo:línea), impacto
+      y recomendación, más una tabla de control (columna Estado) y un plan de
+      remediación por prioridad. Iremos resolviendo y marcando el estado.
+
+[E39] GRUPO 1 — SECRETOS Y ARRANQUE SEGURO (SEC-01, 02, 04, 22): RESUELTO.
+      - SEC-01: se eliminó el fallback de clave JWT hardcodeada en Program.cs y
+        JwtIssuer.cs. Nuevo helper ResolveSecret(...) en Program.cs: exige >=32
+        chars y, si el secreto falta, usa fallback SOLO en Development; en otro
+        entorno LANZA y detiene el arranque (fail-fast). La clave se resuelve una
+        vez y se comparte con el emisor vía el nuevo record JwtOptions (fuente
+        única de verdad); JwtIssuer ya no relee IConfiguration.
+      - SEC-04: el secreto del QR (Qr:Secret) ya NO cae a Jwt:Key. Se resuelve en
+        Program.cs con el mismo fail-fast y un fallback dev DISTINTO al del JWT
+        (dominios de confianza separados). Se quitó la lógica de DependencyInjection.
+      - SEC-02: se quitó Jwt:Key de appsettings.Development.json (quedan Issuer/
+        Audience/ExpiresHours, no secretos). Dev funciona por el fallback del código.
+      - SEC-22: se quitó la connection string de Postgres con contraseña del
+        appsettings.Development.json; el Postgres local de Docker quedó como
+        fallback SOLO-dev en DependencyInjection.cs. En prod, si falta la cadena,
+        el arranque falla.
+      - AddMamboInfrastructure ahora recibe isDevelopment para el fallback de la BD.
+      VERIFICADO: build OK (0 warnings); prod sin secretos aborta con mensaje claro;
+      prod con secretos por env arranca; dev arranca y login admin emite JWT válido
+      (200 con token, 401 sin token).
+      PENDIENTE MENOR: la clave dev anterior sigue en el historial de git (era un
+      placeholder ya reemplazado y sin uso; los secretos de prod nunca se commitearon).

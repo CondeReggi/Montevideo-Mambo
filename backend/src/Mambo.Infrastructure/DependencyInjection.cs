@@ -10,7 +10,7 @@ namespace Mambo.Infrastructure;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddMamboInfrastructure(this IServiceCollection services, IConfiguration config)
+    public static IServiceCollection AddMamboInfrastructure(this IServiceCollection services, IConfiguration config, bool isDevelopment = false)
     {
         // Proveedor de base de datos. Por defecto PostgreSQL (Supabase/Docker).
         // Para desarrollo sin Docker se puede usar SQLite con "Database:Provider=Sqlite".
@@ -26,9 +26,16 @@ public static class DependencyInjection
         }
         else
         {
-            var conn = config.GetConnectionString("Supabase")
-                       ?? config["SUPABASE_DB_CONNECTION"]
-                       ?? throw new InvalidOperationException("Falta la cadena de conexión 'Supabase'.");
+            var conn = config.GetConnectionString("Supabase") ?? config["SUPABASE_DB_CONNECTION"];
+            if (string.IsNullOrWhiteSpace(conn))
+            {
+                // En Development se permite el Postgres local de Docker (no es un secreto real).
+                // En producción la cadena DEBE venir por variable de entorno / secreto (SEC-22).
+                conn = isDevelopment
+                    ? "Host=localhost;Port=55432;Database=mambo;Username=postgres;Password=postgres"
+                    : throw new InvalidOperationException(
+                        "Falta la cadena de conexión 'Supabase'. Configurala por variable de entorno en producción.");
+            }
 
             var dsBuilder = new Npgsql.NpgsqlDataSourceBuilder(conn);
             dsBuilder.MapEnum<Domain.AppRole>("app_role");
@@ -52,10 +59,8 @@ public static class DependencyInjection
         services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
         services.AddSingleton<IJwtIssuer, JwtIssuer>();
 
-        // Token rotativo del QR de clase (Modo B). Secreto propio o, en su defecto, la clave JWT.
-        var qrSecret = config["Qr:Secret"] ?? config["Jwt:Key"]
-                       ?? throw new InvalidOperationException("Falta 'Qr:Secret' o 'Jwt:Key' para firmar los QR.");
-        services.AddSingleton(new QrTokenOptions(qrSecret));
+        // El secreto del QR (QrTokenOptions) se resuelve y registra en Program.cs, junto al JWT,
+        // con la misma política de fail-fast y sin reutilizar la clave JWT (SEC-04).
         services.AddScoped<SessionQrService>();
 
         // Casos de uso
