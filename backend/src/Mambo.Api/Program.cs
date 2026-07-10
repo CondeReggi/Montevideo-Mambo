@@ -50,10 +50,14 @@ builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 var jwtKey = ResolveSecret(builder.Configuration, "Jwt:Key", isDevelopment, devJwtKey, "La clave de firma JWT");
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "mambo";
 var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "mambo";
-var jwtExpiresHours = int.TryParse(builder.Configuration["Jwt:ExpiresHours"], out var h) ? h : 12;
+// Access token de corta vida (minutos); la sesión se prolonga con refresh tokens (días).
+var accessMinutes = int.TryParse(builder.Configuration["Jwt:AccessMinutes"], out var am) ? am : 30;
+var refreshDays = int.TryParse(builder.Configuration["Jwt:RefreshDays"], out var rd) ? rd : 30;
 
 // El emisor de JWT (Infrastructure) consume estos mismos parámetros ya resueltos.
-builder.Services.AddSingleton(new JwtOptions(jwtKey, jwtIssuer, jwtAudience, jwtExpiresHours));
+builder.Services.AddSingleton(new JwtOptions(jwtKey, jwtIssuer, jwtAudience, accessMinutes, refreshDays));
+// Vida del refresh token para AuthService (Application).
+builder.Services.AddSingleton(new Mambo.Application.UseCases.RefreshTokenOptions(refreshDays));
 
 // Secreto propio e independiente para firmar los tokens rotativos del QR de clase (Modo B).
 // No reutiliza la clave JWT (SEC-04): dominios de confianza separados.

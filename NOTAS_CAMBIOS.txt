@@ -1006,3 +1006,36 @@ FIX [F6] enum.ToString() en Selects traducidos a SQL: en Postgres devolvía la
       (200 con token, 401 sin token).
       PENDIENTE MENOR: la clave dev anterior sigue en el historial de git (era un
       placeholder ya reemplazado y sin uso; los secretos de prod nunca se commitearon).
+
+--------------------------------------------------------------------------
+2026-07-10 — Refresh tokens + manejo global de 401 (SEC-08)
+--------------------------------------------------------------------------
+[E40] SESIÓN CON REFRESH TOKEN (resuelve SEC-08 y el reclamo de UX "vuelve a dar
+      401 tras días y no manda a login"). Antes: JWT único de 12 h; al vencer, la
+      guardia de rutas dejaba entrar (solo chequeaba presencia en localStorage) y
+      cada llamada daba 401 con la UI rota.
+      BACKEND:
+        - Access JWT corto: Jwt:AccessMinutes (def. 30 min). Refresh token opaco
+          largo: Jwt:RefreshDays (def. 30 días). Antes existía Jwt:ExpiresHours (12);
+          quedó reemplazado por AccessMinutes/RefreshDays.
+        - Nueva tabla refresh_token (entidad EF + mapeo snake_case + IMamboDbContext;
+          SQL Postgres en db/migrations/007_refresh_token.sql con RLS sin políticas).
+          Se guarda SOLO el hash SHA-256 del token; el valor en claro vive en el cliente.
+        - AuthService: LoginAsync ahora emite access+refresh; RefreshAsync rota (revoca
+          el usado, emite nuevo) con DETECCIÓN DE REUSO (si llega uno ya rotado, revoca
+          toda la cadena del usuario) y valida IsActive; LogoutAsync revoca (idempotente).
+        - Endpoints nuevos: POST /api/auth/refresh y POST /api/auth/logout (AllowAnonymous).
+        - JwtOptions ahora es (Key, Issuer, Audience, AccessMinutes, RefreshDays);
+          se agrega RefreshTokenOptions(Days) para Application. Se resuelven en Program.cs.
+      FRONTEND:
+        - api.ts: manejo GLOBAL de 401 con single-flight refresh + reintento; si el
+          refresh también falla → clearSession + window.location a /login. endSession()
+          revoca en el server (best-effort) y limpia; TopBar la usa en "cerrar sesión".
+        - auth.ts: Session suma refreshToken/refreshExpiresAt + updateTokens().
+      IMPORTANTE (dev): EnsureCreated NO agrega tablas a una BD existente. Para que
+      aparezca refresh_token en local, borrar backend/src/Mambo.Api/mambo_dev.db y
+      re-sembrar (se regenera con el esquema nuevo).
+      VERIFICADO E2E (SQLite): build back+front OK; login→access+refresh; endpoint
+      autenticado 200; refresh rota (par nuevo distinto); reuso del refresh viejo→401 y
+      corta la cadena; logout→204 y refresh posterior→401; logout idempotente→204;
+      token basura→401 (no 500). Tabla refresh_token creada sin errores.

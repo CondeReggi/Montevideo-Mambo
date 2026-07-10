@@ -22,6 +22,7 @@ public interface IMamboDbContext
     DbSet<Payment> Payments { get; }
     DbSet<QrToken> QrTokens { get; }
     DbSet<AuditLog> AuditLogs { get; }
+    DbSet<RefreshToken> RefreshTokens { get; }
 
     DatabaseFacade Database { get; }
     Task<int> SaveChangesAsync(CancellationToken ct = default);

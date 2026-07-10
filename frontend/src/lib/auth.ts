@@ -4,6 +4,8 @@
 export interface Session {
   token: string;
   expiresAt: string;
+  refreshToken: string;
+  refreshExpiresAt: string;
   userId: string;
   fullName: string;
   email: string;
@@ -35,6 +37,22 @@ export function clearSession() {
 
 export function getToken(): string | null {
   return getSession()?.token ?? null;
+}
+
+export function getRefreshToken(): string | null {
+  return getSession()?.refreshToken ?? null;
+}
+
+/** Actualiza SOLO los tokens (tras renovar la sesión), conservando el resto de los datos. */
+export function updateTokens(
+  token: string,
+  expiresAt: string,
+  refreshToken: string,
+  refreshExpiresAt: string
+) {
+  const s = getSession();
+  if (!s) return;
+  setSession({ ...s, token, expiresAt, refreshToken, refreshExpiresAt });
 }
 
 export function hasRole(role: string): boolean {

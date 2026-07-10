@@ -28,7 +28,7 @@ recomendación. La severidad asume un despliegue **real, expuesto a internet** (
 | SEC-05 | 🟠 | Sin HTTPS forzado / HSTS: tokens Bearer viajan en claro | Pendiente |
 | SEC-06 | 🟠 | JWT guardado en `localStorage` (robo por XSS) | Pendiente |
 | SEC-07 | 🟠 | Login sin rate limiting ni bloqueo por intentos (fuerza bruta) | Pendiente |
-| SEC-08 | 🟠 | Sin revocación de tokens / logout de servidor / refresh | Pendiente |
+| SEC-08 | 🟠 | Sin revocación de tokens / logout de servidor / refresh | ✅ Resuelto (2026-07-10) |
 | SEC-09 | 🟠 | `DevController` de seed depende solo de `IsDevelopment()` | Pendiente |
 | SEC-10 | 🟡 | CORS y `AllowedHosts` permisivos / frágiles ante mala config | Pendiente |
 | SEC-11 | 🟡 | Códigos QR fijos de alumno predecibles (`STU-ANA-001`) | Pendiente |
@@ -142,6 +142,22 @@ recomendación. La severidad asume un despliegue **real, expuesto a internet** (
 - **Impacto:** un token robado o el de un usuario dado de baja/comprometido **sigue funcionando hasta 12h**.
 - **Recomendación:** access tokens **cortos** (5–15 min) + **refresh token** rotatorio persistido/revocable;
   o lista de revocación (jti en caché/BD). Verificar `IsActive` del usuario en cada request sensible.
+- **✅ Resolución (2026-07-10):** se implementó **refresh token completo**:
+  - Access JWT corto (`Jwt:AccessMinutes`, por defecto **30 min**) + refresh token opaco largo
+    (`Jwt:RefreshDays`, por defecto **30 días**), guardado en BD **solo como hash SHA-256**
+    (nueva tabla `refresh_token`; entidad EF + `db/migrations/007_refresh_token.sql`).
+  - Endpoints nuevos: `POST /api/auth/refresh` (rota el token: revoca el usado y emite uno nuevo)
+    y `POST /api/auth/logout` (revoca; idempotente).
+  - **Rotación con detección de reuso:** si llega un refresh ya rotado, se revoca **toda la cadena**
+    del usuario (mitiga robo). Se verifica `IsActive` en cada refresh (⇒ un usuario dado de baja
+    pierde acceso en ≤30 min, ya no en 12 h).
+  - Frontend: manejo global de 401 en `api.ts` con **single-flight refresh** + reintento; si el
+    refresh también falla → limpia sesión y redirige a `/login` (ver más abajo). Logout revoca en
+    el server antes de limpiar el cliente.
+  - Verificado E2E: login/refresh/rotación/reuso/logout/idempotencia/token inválido → todos con el
+    código HTTP esperado (401, no 500).
+  - **Nota:** el refresh token se guarda en `localStorage` (consistente con el esquema actual). Pasar
+    ambos tokens a cookie `HttpOnly` queda cubierto por **SEC-06** (pendiente).
 
 ### SEC-09 — `DevController` de seed depende solo de `IsDevelopment()`
 - **Ubicación:** `backend/src/Mambo.Api/Controllers/DevController.cs:10-31`

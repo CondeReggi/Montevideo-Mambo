@@ -32,6 +32,55 @@ en local (modo SQLite). Antes de cambios grandes, leer la bitácora y dejar una 
   de `db/`; el saldo/deuda los calcula el backend, así que el flujo funciona igual.
 - **No usar** Firebase ni NoSQL (la lógica es relacional). No implementar pasarela de pago.
 
+## Comandos
+
+Detalle completo y flujo de prueba E2E en `RUN_LOCAL.md`. Resumen:
+
+**Backend (.NET 8)** — desde `backend/` (solución `Mambo.slnx`, formato nuevo; no hay `.sln`):
+```bash
+dotnet build                                   # compilar toda la solución
+dotnet test                                    # correr los tests de dominio (xUnit)
+dotnet test --filter "FullyQualifiedName~AttendanceWindowTests"   # un solo test/clase
+dotnet run --project src/Mambo.Api             # API en http://localhost:5080 (Swagger en /swagger)
+```
+Solo hay un proyecto de tests: `tests/Mambo.Domain.Tests` (reglas puras de dominio;
+`AttendanceWindowTests`, `ConsumptionPolicyTests`). No hay tests de Application/Api.
+
+**Frontend (Next.js 14)** — desde `frontend/`:
+```bash
+npm install        # primera vez
+npm run dev        # http://localhost:3000 (apunta al API por NEXT_PUBLIC_API_URL en .env.local)
+npm run build      # build de producción
+npm run lint       # ESLint (next lint) — no hay tests de frontend
+```
+
+**Datos demo** (backend corriendo en Development): `POST /api/dev/seed` (usuarios, clase de hoy,
+cuponeras, pendientes) y `POST /api/dev/seed-horarios` (grilla 2026). El seed es **idempotente**:
+para reprobar desde cero, borrar `backend/src/Mambo.Api/mambo_dev.db` (Opción A SQLite) y re-sembrar.
+
+**Elegir base de datos:** `Database:Provider` en `backend/src/Mambo.Api/appsettings.Development.json`
+→ `"Sqlite"` (por defecto, sin Docker, esquema por `EnsureCreated`) o `"Npgsql"` (Postgres en
+Docker: `docker compose up -d`, aplica el SQL de `db/`; reset con `docker compose down -v`).
+
+## Arquitectura del backend (capas)
+
+Dependencias: `Api → Infrastructure → Application → Domain` (Domain no depende de nadie).
+- **`Mambo.Domain`** — entidades (`Entities/`) y **reglas puras sin dependencias** (`Rules/`:
+  `AttendanceWindow`, `ConsumptionPolicy`). Es lo único cubierto por tests; poner aquí la lógica
+  de negocio testeable en aislamiento.
+- **`Mambo.Application`** — casos de uso (`UseCases/`, `Attendance/`) y **abstracciones**
+  (`Abstractions/`: `IMamboDbContext`, `IClock`, `IPhotoStorage`, `IAuth`). La lógica transaccional
+  (confirmar asistencia + ledger) vive aquí; depende de interfaces, no de EF/Npgsql.
+- **`Mambo.Infrastructure`** — `MamboDbContext` (EF Core, mapeo **snake_case** manual en
+  `OnModelCreating`), servicios (reloj, auditoría, PBKDF2, JWT, Supabase Storage) y `DependencyInjection`.
+  **Los `HasPostgresEnum` solo se aplican con Npgsql**; en SQLite los enums se guardan como int
+  (por eso el modo SQLite funciona sin el SQL de `db/`).
+- **`Mambo.Api`** — controllers (`Controllers/`), auth JWT (`Auth/CurrentUser`), CORS, Swagger,
+  `Program.cs`. El `DevController` (seed) solo existe en Development.
+
+El **esquema real de PostgreSQL es el SQL de `db/`** (migraciones, vistas, triggers, RLS), no
+migraciones EF. En SQLite el esquema lo crea `EnsureCreated` y el saldo/deuda los calcula el backend.
+
 ## Estructura de la carpeta
 
 ```
@@ -58,7 +107,10 @@ Fuente: `Referencias/` (flyers del cliente). Es OBLIGATORIO respetarla en cualqu
 
 ## Endpoints principales del API (.NET)
 
-- Auth: `POST /api/auth/login`. Dev: `POST /api/dev/seed`, `POST /api/dev/seed-horarios`.
+- Auth: `POST /api/auth/login` (devuelve access JWT + refresh token), `POST /api/auth/refresh`
+  (rota el refresh y renueva el access), `POST /api/auth/logout` (revoca el refresh). Access de
+  vida corta (`Jwt:AccessMinutes`, def. 30) + refresh largo revocable (`Jwt:RefreshDays`, def. 30);
+  el hash del refresh se guarda en la tabla `refresh_token`. Dev: `POST /api/dev/seed`, `POST /api/dev/seed-horarios`.
 - Público (sin auth): `GET /api/public/schedule` (grilla de clases activas para /horarios).
 - Check-in: `POST /api/checkin/qr` (Modo A: recepción escanea al alumno). Sesiones:
   `GET /api/sessions/today`, `.../{id}/attendances`, `POST /api/sessions/ensure-today`

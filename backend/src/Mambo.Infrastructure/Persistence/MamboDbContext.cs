@@ -22,6 +22,7 @@ public class MamboDbContext(DbContextOptions<MamboDbContext> options) : DbContex
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<QrToken> QrTokens => Set<QrToken>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -164,6 +165,15 @@ public class MamboDbContext(DbContextOptions<MamboDbContext> options) : DbContex
             e.ToTable("audit_log");
             e.HasKey(x => x.Id);
             e.Property(x => x.Detail).HasColumnType("jsonb");
+        });
+
+        b.Entity<RefreshToken>(e =>
+        {
+            e.ToTable("refresh_token");
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.TokenHash).IsUnique();
+            e.HasIndex(x => x.UserId);
+            e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId);
         });
 
         base.OnModelCreating(b);

@@ -1,6 +1,9 @@
-import { getToken } from "./auth";
+import { getToken, getSession, getRefreshToken, updateTokens, clearSession } from "./auth";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5080";
+
+// Endpoints de auth: un 401 acá NO debe disparar refresh (evita bucles).
+const AUTH_PATHS = ["/api/auth/login", "/api/auth/refresh", "/api/auth/logout"];
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -8,10 +11,9 @@ export class ApiError extends Error {
   }
 }
 
-/** Llama al backend .NET adjuntando el JWT de sesión como Bearer. */
-export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function rawFetch(path: string, options: RequestInit): Promise<Response> {
   const token = getToken();
-  const res = await fetch(`${API_URL}${path}`, {
+  return fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -19,6 +21,80 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
       ...(options.headers ?? {}),
     },
   });
+}
+
+// Renovación con "single-flight": varias llamadas que reciben 401 a la vez
+// comparten un único intento de refresh en lugar de dispararlo N veces.
+let refreshPromise: Promise<boolean> | null = null;
+
+async function tryRefresh(): Promise<boolean> {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return false;
+  if (!refreshPromise) {
+    refreshPromise = (async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/auth/refresh`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refreshToken }),
+        });
+        if (!res.ok) return false;
+        const data = await res.json();
+        updateTokens(data.token, data.expiresAt, data.refreshToken, data.refreshExpiresAt);
+        return true;
+      } catch {
+        return false;
+      } finally {
+        // Liberar en el próximo tick para que las llamadas concurrentes reusen este intento.
+        setTimeout(() => (refreshPromise = null), 0);
+      }
+    })();
+  }
+  return refreshPromise;
+}
+
+/** Sesión inválida/expirada sin posibilidad de renovar → limpiar y volver a login. */
+function forceLogout() {
+  clearSession();
+  if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+    window.location.href = "/login";
+  }
+}
+
+/** Cierra la sesión: revoca el refresh token en el backend (best-effort) y limpia el cliente. */
+export async function endSession(): Promise<void> {
+  const refreshToken = getSession()?.refreshToken;
+  if (refreshToken) {
+    try {
+      await fetch(`${API_URL}/api/auth/logout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken }),
+      });
+    } catch {
+      /* best-effort: aunque falle, igual limpiamos localmente */
+    }
+  }
+  clearSession();
+}
+
+/** Llama al backend .NET adjuntando el JWT de sesión como Bearer. */
+export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
+  let res = await rawFetch(path, options);
+
+  // 401 en un endpoint normal → intentar renovar una vez y reintentar.
+  if (res.status === 401 && !AUTH_PATHS.some((p) => path.startsWith(p))) {
+    const renewed = await tryRefresh();
+    if (!renewed) {
+      forceLogout();
+      throw new ApiError(401, "Tu sesión expiró. Iniciá sesión de nuevo.");
+    }
+    res = await rawFetch(path, options);
+    if (res.status === 401) {
+      forceLogout();
+      throw new ApiError(401, "Tu sesión expiró. Iniciá sesión de nuevo.");
+    }
+  }
 
   if (!res.ok) {
     let msg = `Error ${res.status}`;
@@ -115,6 +191,8 @@ export const correctAttendance = (id: string, reason?: string) =>
 export interface LoginResult {
   token: string;
   expiresAt: string;
+  refreshToken: string;
+  refreshExpiresAt: string;
   userId: string;
   fullName: string;
   email: string;

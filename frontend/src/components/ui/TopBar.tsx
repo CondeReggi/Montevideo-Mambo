@@ -6,7 +6,8 @@ import { useEffect, useRef, useState } from "react";
 import { Logo } from "./Logo";
 import { Avatar } from "./index";
 import { IconLogout, IconQr, IconUsers, IconCalendar, IconCash, IconTicket, IconSpark, IconGear } from "./Icons";
-import { getSession, clearSession, Session } from "@/lib/auth";
+import { getSession, Session } from "@/lib/auth";
+import { endSession } from "@/lib/api";
 import InstallBanner from "@/components/InstallBanner";
 
 interface NavItem {
@@ -44,8 +45,8 @@ export function TopBar() {
     mobileActiveRef.current?.scrollIntoView(opts);
   }, [pathname, session]);
 
-  const logout = () => {
-    clearSession();
+  const logout = async () => {
+    await endSession();
     router.push("/login");
   };
 
