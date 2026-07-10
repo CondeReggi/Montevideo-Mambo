@@ -7,10 +7,14 @@ import { IconQr } from "@/components/ui/Icons";
 
 /**
  * Genera y muestra el QR fijo del alumno (a partir de su código) para que la
- * recepción lo escanee. Incluye impresión en una ventana limpia (carnet).
+ * recepción lo escanee. "Ver / imprimir carnet" abre un overlay a PANTALLA COMPLETA
+ * (grande y legible en el celular) con botón Volver siempre visible y opción de
+ * imprimir (CSS @media print aísla la tarjeta #carnet-print). Reemplaza al viejo
+ * window.open, que en mobile se veía diminuto y dejaba al usuario atrapado.
  */
 export default function StudentQr({ code, name }: { code: string; name: string }) {
   const [dataUrl, setDataUrl] = useState<string>("");
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     if (!code) return;
@@ -24,33 +28,20 @@ export default function StudentQr({ code, name }: { code: string; name: string }
       .catch(() => setDataUrl(""));
   }, [code]);
 
-  const print = () => {
-    if (!dataUrl) return;
-    const w = window.open("", "_blank", "width=420,height=560");
-    if (!w) return;
-    w.document.write(`<!doctype html><html><head><title>QR ${name}</title>
-      <style>
-        *{margin:0;box-sizing:border-box;font-family:Arial,Helvetica,sans-serif}
-        body{display:flex;align-items:center;justify-content:center;min-height:100vh;background:#fff}
-        .card{border:3px solid #0B0B0C;border-radius:20px;padding:28px 24px;text-align:center;width:340px}
-        .brand{font-weight:800;letter-spacing:.18em;font-size:13px;color:#0B0B0C}
-        .accent{display:inline-block;background:#C4F82B;padding:2px 10px;border-radius:999px;margin-top:6px;font-size:11px;letter-spacing:.14em;font-weight:700}
-        img{width:260px;height:260px;margin:18px auto;display:block}
-        .name{font-weight:700;font-size:18px;color:#0B0B0C}
-        .code{font-family:monospace;font-size:13px;color:#555;margin-top:4px}
-        @media print{@page{margin:0}}
-      </style></head><body>
-      <div class="card">
-        <div class="brand">MONTEVIDEO MAMBO</div>
-        <div class="accent">CARNET DE ALUMNO</div>
-        <img src="${dataUrl}" alt="QR"/>
-        <div class="name">${name}</div>
-        <div class="code">${code}</div>
-      </div>
-      <script>window.onload=function(){setTimeout(function(){window.print()},250)}</script>
-      </body></html>`);
-    w.document.close();
-  };
+  // Con el carnet abierto: cerrar con Escape y bloquear el scroll del fondo.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [open]);
 
   return (
     <div className="flex flex-col items-center gap-3">
@@ -65,9 +56,71 @@ export default function StudentQr({ code, name }: { code: string; name: string }
         </div>
       )}
       <p className="font-mono text-xs text-muted">{code}</p>
-      <Button variant="ghost" className="btn-sm" onClick={print} icon={<IconQr />} disabled={!dataUrl}>
-        Imprimir carnet
+      <Button
+        variant="ghost"
+        className="btn-sm"
+        onClick={() => setOpen(true)}
+        icon={<IconQr />}
+        disabled={!dataUrl}
+      >
+        Ver / imprimir carnet
       </Button>
+
+      {open && (
+        <div
+          className="fixed inset-0 z-[120] flex flex-col bg-black/85 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Carnet de ${name}`}
+        >
+          {/* Barra superior: Volver (siempre visible) + Imprimir. */}
+          <div className="flex items-center justify-between px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+            <button
+              onClick={() => setOpen(false)}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition active:scale-95"
+            >
+              <span aria-hidden>←</span> Volver
+            </button>
+            <button
+              onClick={() => window.print()}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-lime px-4 py-2.5 text-sm font-bold text-ink-900 transition active:scale-95"
+            >
+              <IconQr /> Imprimir
+            </button>
+          </div>
+
+          {/* Carnet grande y centrado: ocupa la pantalla en el celular. */}
+          <div className="flex flex-1 items-center justify-center overflow-auto p-4">
+            <div
+              id="carnet-print"
+              className="w-full max-w-sm rounded-3xl border-4 bg-white px-6 py-8 text-center"
+              style={{ borderColor: "#0B0B0C" }}
+            >
+              <div className="text-[13px] font-extrabold tracking-[0.18em]" style={{ color: "#0B0B0C" }}>
+                MONTEVIDEO MAMBO
+              </div>
+              <div
+                className="mt-1.5 inline-block rounded-full px-3 py-0.5 text-[11px] font-bold tracking-[0.14em]"
+                style={{ background: "#C4F82B", color: "#0B0B0C" }}
+              >
+                CARNET DE ALUMNO
+              </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={dataUrl}
+                alt={`QR de ${name}`}
+                className="mx-auto my-6 aspect-square w-[72vw] max-w-[300px]"
+              />
+              <div className="text-xl font-bold" style={{ color: "#0B0B0C" }}>
+                {name}
+              </div>
+              <div className="mt-1 font-mono text-sm" style={{ color: "#555" }}>
+                {code}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -155,3 +155,27 @@ body::before {
 html, body {
   overscroll-behavior-y: contain;
 }
+
+/* Impresión del carnet: mostrar SOLO la tarjeta #carnet-print, centrada, con sus
+   colores de marca (print-color-adjust) y sin el resto de la UI. */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  #carnet-print,
+  #carnet-print * {
+    visibility: visible !important;
+  }
+  #carnet-print {
+    position: fixed !important;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 340px !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  @page {
+    margin: 12mm;
+  }
+}

@@ -1084,3 +1084,16 @@ FIX [F6] enum.ToString() en Selects traducidos a SQL: en Postgres devolvía la
       imagenes (las iniciales/avatares sin foto no se afectan).
       VERIFICADO: build front OK; cabecera CSP con nonce; 15/15 <script> con nonce (la
       app hidrata); cabeceras de seguridad presentes.
+
+--------------------------------------------------------------------------
+2026-07-10 — Fix mobile: carnet QR a pantalla completa + boton Volver
+--------------------------------------------------------------------------
+[E46] BUG mobile en "imprimir carnet" (StudentQr): abria con window.open + document.
+      write y auto window.print(). En el celular se veia DIMINUTO (la ventana no tenia
+      <meta viewport>, se renderizaba a ~980px) y era una pestaña nueva SIN forma de
+      volver -> el usuario quedaba atrapado. Ahora "Ver / imprimir carnet" abre un
+      OVERLAY a pantalla completa dentro de la app: carnet grande (max-w-sm, QR 72vw),
+      boton "Volver" siempre visible (+ tecla Escape, bloqueo de scroll de fondo) y
+      boton "Imprimir". La impresion aisla la tarjeta #carnet-print con @media print en
+      globals.css (visibility + print-color-adjust para conservar el lima). Aplica al
+      panel del alumno (/me) y a la ficha admin (/admin/students/[id]). Build OK.
