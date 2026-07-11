@@ -1099,3 +1099,17 @@ FIX [F6] enum.ToString() en Selects traducidos a SQL: en Postgres devolvía la
       tamaño fijo 240px en papel). El boton se usa desde el panel del alumno (/me) y la
       ficha admin (/admin/students/[id]). VERIFICADO: build OK; /carnet responde 200 con
       la card (marca, nombre, codigo, flecha).
+
+--------------------------------------------------------------------------
+2026-07-11 — Nav mobile: menu burger + sidebar deslizable (TopBar)
+--------------------------------------------------------------------------
+[E47] En mobile la navegacion era una fila horizontal con scroll (poco comoda). Ahora
+      es un MENU BURGER que abre un SIDEBAR/DRAWER deslizable desde la izquierda
+      (animacion slide-in-left + backdrop con fade). Aplica a todos los roles (alumno,
+      profe, admin): el drawer arma sus items segun el rol. Incluye: encabezado con logo
+      y boton cerrar (X), datos del usuario (avatar+nombre+roles), lista de navegacion
+      vertical con item activo resaltado en lima, y al pie Configuracion + Cerrar sesion.
+      Cierra al elegir un item, tocar el backdrop, con Escape o al cambiar de ruta; se
+      bloquea el scroll de fondo mientras esta abierto. En >=md se mantiene la barra
+      horizontal + acciones a la derecha (los iconos settings/logout se ocultan en mobile
+      porque viven en el drawer). Se agrego IconMenu y la animacion slide-in-left. Build OK.

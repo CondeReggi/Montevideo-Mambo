@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Logo } from "./Logo";
 import { Avatar } from "./index";
-import { IconLogout, IconQr, IconUsers, IconCalendar, IconCash, IconTicket, IconSpark, IconGear } from "./Icons";
+import { IconLogout, IconQr, IconUsers, IconCalendar, IconCash, IconTicket, IconSpark, IconGear, IconMenu, IconX } from "./Icons";
 import { getSession, Session } from "@/lib/auth";
 import { endSession } from "@/lib/api";
 import InstallBanner from "@/components/InstallBanner";
@@ -33,33 +33,62 @@ export function TopBar() {
   const router = useRouter();
   const pathname = usePathname();
   const [session, setSession] = useState<Session | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const desktopActiveRef = useRef<HTMLAnchorElement>(null);
-  const mobileActiveRef = useRef<HTMLAnchorElement>(null);
 
   useEffect(() => setSession(getSession()), [pathname]);
 
-  // El item seleccionado siempre visible: se centra en su barra (incluye al refrescar).
+  // Cerrar el menú móvil al cambiar de ruta.
+  useEffect(() => setMenuOpen(false), [pathname]);
+
+  // El item seleccionado siempre visible en la barra de escritorio (incluye al refrescar).
   useEffect(() => {
-    const opts: ScrollIntoViewOptions = { inline: "center", block: "nearest" };
-    desktopActiveRef.current?.scrollIntoView(opts);
-    mobileActiveRef.current?.scrollIntoView(opts);
+    desktopActiveRef.current?.scrollIntoView({ inline: "center", block: "nearest" });
   }, [pathname, session]);
 
+  // Con el menú abierto: cerrar con Escape y bloquear el scroll del fondo.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [menuOpen]);
+
   const logout = async () => {
+    setMenuOpen(false);
     await endSession();
     router.push("/login");
   };
 
   const items = session ? NAV.filter((n) => n.roles.some((r) => session.roles.includes(r))) : [];
+  const isActive = (href: string) => pathname === href || (href !== "/admin" && pathname.startsWith(href));
 
   return (
     <header className="sticky top-0 z-40 border-b border-ink-500/60 bg-ink-900/80 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4">
+        {/* Burger (solo móvil) */}
+        {items.length > 0 && (
+          <button
+            onClick={() => setMenuOpen(true)}
+            aria-label="Abrir menú"
+            className="-ml-1 grid h-10 w-10 place-items-center rounded-lg border border-ink-500 text-lg text-foreground transition hover:border-lime/40 hover:text-lime active:scale-95 md:hidden"
+          >
+            <IconMenu />
+          </button>
+        )}
+
         <Logo />
 
         <nav className="scrollbar-thin ml-4 hidden flex-1 items-center gap-1 overflow-x-auto md:flex">
           {items.map((n) => {
-            const active = pathname === n.href || (n.href !== "/admin" && pathname.startsWith(n.href));
+            const active = isActive(n.href);
             return (
               <Link
                 key={n.href}
@@ -90,17 +119,18 @@ export function TopBar() {
                   </p>
                 </div>
               </div>
+              {/* En móvil estas acciones viven dentro del menú lateral. */}
               <Link
                 href="/settings"
                 title="Configuración"
-                className="grid h-9 w-9 place-items-center rounded-lg border border-ink-500 text-muted transition hover:border-lime/40 hover:text-lime"
+                className="hidden h-9 w-9 place-items-center rounded-lg border border-ink-500 text-muted transition hover:border-lime/40 hover:text-lime md:grid"
               >
                 <IconGear />
               </Link>
               <button
                 onClick={logout}
                 title="Cerrar sesión"
-                className="grid h-9 w-9 place-items-center rounded-lg border border-ink-500 text-muted transition hover:border-red-500/40 hover:text-red-300"
+                className="hidden h-9 w-9 place-items-center rounded-lg border border-ink-500 text-muted transition hover:border-red-500/40 hover:text-red-300 md:grid"
               >
                 <IconLogout />
               </button>
@@ -113,26 +143,85 @@ export function TopBar() {
         </div>
       </div>
 
-      {/* Nav móvil */}
-      {items.length > 0 && (
-        <nav className="scrollbar-thin flex items-center gap-1 overflow-x-auto border-t border-ink-500/40 px-3 py-2 md:hidden">
-          {items.map((n) => {
-            const active = pathname === n.href || (n.href !== "/admin" && pathname.startsWith(n.href));
-            return (
-              <Link
-                key={n.href}
-                href={n.href}
-                ref={active ? mobileActiveRef : undefined}
-                className={`flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                  active ? "bg-lime/15 text-lime" : "text-muted-soft"
-                }`}
+      {/* Menú lateral (drawer) móvil */}
+      {menuOpen && items.length > 0 && (
+        <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true" aria-label="Menú">
+          <div
+            className="absolute inset-0 animate-fade-in bg-black/60 backdrop-blur-sm"
+            onClick={() => setMenuOpen(false)}
+          />
+          <div className="absolute inset-y-0 left-0 flex w-[84%] max-w-xs animate-slide-in-left flex-col border-r border-ink-500/60 bg-ink-900 shadow-2xl">
+            {/* Encabezado del drawer */}
+            <div className="flex h-16 items-center justify-between border-b border-ink-500/50 px-4">
+              <Logo />
+              <button
+                onClick={() => setMenuOpen(false)}
+                aria-label="Cerrar menú"
+                className="grid h-10 w-10 place-items-center rounded-lg border border-ink-500 text-lg text-muted transition hover:text-foreground active:scale-95"
               >
-                <span className="text-sm">{n.icon}</span>
-                {n.label}
+                <IconX />
+              </button>
+            </div>
+
+            {/* Usuario */}
+            {session && (
+              <div className="flex items-center gap-3 border-b border-ink-500/40 px-4 py-4">
+                <Avatar name={session.fullName} size="md" />
+                <div className="min-w-0 leading-tight">
+                  <p className="truncate text-sm font-semibold">{session.fullName}</p>
+                  <p className="text-[11px] uppercase tracking-wide text-muted">
+                    {session.roles.join(" · ")}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Navegación */}
+            <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-3">
+              {items.map((n) => {
+                const active = isActive(n.href);
+                return (
+                  <Link
+                    key={n.href}
+                    href={n.href}
+                    onClick={() => setMenuOpen(false)}
+                    className={`flex items-center gap-3 rounded-xl px-3.5 py-3 text-sm font-medium transition ${
+                      active
+                        ? "bg-lime/15 text-lime"
+                        : "text-muted-soft hover:bg-ink-700 hover:text-foreground"
+                    }`}
+                  >
+                    <span className="text-lg">{n.icon}</span>
+                    {n.label}
+                  </Link>
+                );
+              })}
+            </nav>
+
+            {/* Acciones */}
+            <div className="flex flex-col gap-1 border-t border-ink-500/50 px-3 py-3">
+              <Link
+                href="/settings"
+                onClick={() => setMenuOpen(false)}
+                className="flex items-center gap-3 rounded-xl px-3.5 py-3 text-sm font-medium text-muted-soft transition hover:bg-ink-700 hover:text-foreground"
+              >
+                <span className="text-lg">
+                  <IconGear />
+                </span>
+                Configuración
               </Link>
-            );
-          })}
-        </nav>
+              <button
+                onClick={logout}
+                className="flex items-center gap-3 rounded-xl px-3.5 py-3 text-left text-sm font-medium text-red-300 transition hover:bg-red-500/10"
+              >
+                <span className="text-lg">
+                  <IconLogout />
+                </span>
+                Cerrar sesión
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </header>
   );
