@@ -172,8 +172,17 @@ html, body {
     left: 50%;
     transform: translate(-50%, -50%);
     width: 340px !important;
+    height: auto !important;
+    gap: 16px !important;
+    padding: 24px !important;
+    border-radius: 20px !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+  /* En papel el QR va a tamaño fijo (en pantalla usa vw, que en impresión desbordaría). */
+  #carnet-print img {
+    width: 240px !important;
+    height: 240px !important;
   }
   @page {
     margin: 12mm;

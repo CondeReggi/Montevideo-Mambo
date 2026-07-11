@@ -1092,8 +1092,9 @@ FIX [F6] enum.ToString() en Selects traducidos a SQL: en Postgres devolvía la
       write y auto window.print(). En el celular se veia DIMINUTO (la ventana no tenia
       <meta viewport>, se renderizaba a ~980px) y era una pestaña nueva SIN forma de
       volver -> el usuario quedaba atrapado. Ahora "Ver / imprimir carnet" abre un
-      OVERLAY a pantalla completa dentro de la app: carnet grande (max-w-sm, QR 72vw),
-      boton "Volver" siempre visible (+ tecla Escape, bloqueo de scroll de fondo) y
-      boton "Imprimir". La impresion aisla la tarjeta #carnet-print con @media print en
-      globals.css (visibility + print-color-adjust para conservar el lima). Aplica al
-      panel del alumno (/me) y a la ficha admin (/admin/students/[id]). Build OK.
+      OVERLAY a PANTALLA COMPLETA dentro de la app: la card de carnet LLENA la pantalla
+      (border de marca, QR 80vw/max 380px), con la FLECHA de volver flotante arriba a la
+      izquierda (+ tecla Escape, bloqueo de scroll) e "Imprimir" arriba a la derecha.
+      La impresion aisla la tarjeta #carnet-print con @media print en globals.css
+      (visibility + print-color-adjust para el lima; QR a tamaño fijo 240px en papel).
+      Aplica al panel del alumno (/me) y a la ficha admin (/admin/students/[id]). Build OK.

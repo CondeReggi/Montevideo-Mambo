@@ -68,54 +68,58 @@ export default function StudentQr({ code, name }: { code: string; name: string }
 
       {open && (
         <div
-          className="fixed inset-0 z-[120] flex flex-col bg-black/85 backdrop-blur-sm"
+          className="fixed inset-0 z-[120] bg-ink-900/95 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-label={`Carnet de ${name}`}
         >
-          {/* Barra superior: Volver (siempre visible) + Imprimir. */}
-          <div className="flex items-center justify-between px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-            <button
-              onClick={() => setOpen(false)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition active:scale-95"
-            >
-              <span aria-hidden>←</span> Volver
-            </button>
-            <button
-              onClick={() => window.print()}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-lime px-4 py-2.5 text-sm font-bold text-ink-900 transition active:scale-95"
-            >
-              <IconQr /> Imprimir
-            </button>
-          </div>
+          {/* Flecha para volver: flotante arriba a la izquierda (siempre visible). */}
+          <button
+            onClick={() => setOpen(false)}
+            aria-label="Volver"
+            className="absolute left-4 top-[max(1rem,env(safe-area-inset-top))] z-10 grid h-11 w-11 place-items-center rounded-full border border-white/25 bg-black/40 text-2xl leading-none text-white backdrop-blur transition active:scale-95"
+          >
+            <span aria-hidden>←</span>
+          </button>
+          {/* Imprimir: flotante arriba a la derecha. */}
+          <button
+            onClick={() => window.print()}
+            className="absolute right-4 top-[max(1rem,env(safe-area-inset-top))] z-10 inline-flex items-center gap-1.5 rounded-full bg-lime px-4 py-2.5 text-sm font-bold text-ink-900 transition active:scale-95"
+          >
+            <IconQr /> Imprimir
+          </button>
 
-          {/* Carnet grande y centrado: ocupa la pantalla en el celular. */}
-          <div className="flex flex-1 items-center justify-center overflow-auto p-4">
+          {/* Carnet a PANTALLA COMPLETA con diseño de card (llena la pantalla, márgenes mínimos). */}
+          <div className="flex h-full w-full overflow-y-auto p-3 pt-[max(4.5rem,calc(env(safe-area-inset-top)+4rem))]">
             <div
               id="carnet-print"
-              className="w-full max-w-sm rounded-3xl border-4 bg-white px-6 py-8 text-center"
+              className="flex w-full flex-col items-center justify-center gap-7 rounded-[28px] border-4 bg-white px-6 py-8 text-center"
               style={{ borderColor: "#0B0B0C" }}
             >
-              <div className="text-[13px] font-extrabold tracking-[0.18em]" style={{ color: "#0B0B0C" }}>
-                MONTEVIDEO MAMBO
-              </div>
-              <div
-                className="mt-1.5 inline-block rounded-full px-3 py-0.5 text-[11px] font-bold tracking-[0.14em]"
-                style={{ background: "#C4F82B", color: "#0B0B0C" }}
-              >
-                CARNET DE ALUMNO
+              <div>
+                <div className="text-lg font-extrabold tracking-[0.2em]" style={{ color: "#0B0B0C" }}>
+                  MONTEVIDEO MAMBO
+                </div>
+                <div
+                  className="mt-2 inline-block rounded-full px-4 py-1 text-xs font-bold tracking-[0.16em]"
+                  style={{ background: "#C4F82B", color: "#0B0B0C" }}
+                >
+                  CARNET DE ALUMNO
+                </div>
               </div>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={dataUrl}
                 alt={`QR de ${name}`}
-                className="mx-auto my-6 aspect-square w-[72vw] max-w-[300px]"
+                className="aspect-square w-[80vw] max-w-[380px]"
               />
-              <div className="text-xl font-bold" style={{ color: "#0B0B0C" }}>
-                {name}
-              </div>
-              <div className="mt-1 font-mono text-sm" style={{ color: "#555" }}>
-                {code}
+              <div>
+                <div className="text-2xl font-bold" style={{ color: "#0B0B0C" }}>
+                  {name}
+                </div>
+                <div className="mt-1 font-mono text-sm" style={{ color: "#555" }}>
+                  {code}
+                </div>
               </div>
             </div>
           </div>
