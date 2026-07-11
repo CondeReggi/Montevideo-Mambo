@@ -20,7 +20,7 @@ Cada ítem tiene: **ID**, impacto, ubicación (`archivo:línea`), qué pasa y la
 
 | ID | Impacto | Título | Estado |
 |---|---|---|---|
-| PERF-01 | 🔴 | Render **free**: cold starts (~30–60 s) + 0.1 vCPU / 512 MB | Pendiente |
+| PERF-01 | 🔴 | Render **free**: cold starts (~30–60 s) + 0.1 vCPU / 512 MB | 🟡 Mitigado (keep-alive, 2026-07-11) |
 | PERF-02 | 🔴 | N+1 en `sessions/{id}/attendances` (resumen + signed URL por fila) | Pendiente |
 | PERF-03 | 🔴 | La CSP con nonce volvió **todas** las rutas dinámicas (regresión) | Pendiente |
 | PERF-04 | 🟠 | `StudentSummaryService`: ~5 queries + 1 HTTP por llamada | Pendiente |
@@ -54,6 +54,11 @@ Cada ítem tiene: **ID**, impacto, ubicación (`archivo:línea`), qué pasa y la
      y elimina la mayoría de los cold starts. (Se puede con un cron gratuito externo o un GitHub Action.)
   2. Subir a un **plan pago de Render** (starter) → sin spin-down y más CPU/RAM.
   3. Optimizar el arranque .NET (ReadyToRun/AOT) para que el cold start sea más corto.
+- **🟡 Mitigación (2026-07-11):** se agregó un **GitHub Action** (`.github/workflows/keep-alive.yml`)
+  que pinguea `/health` **cada 5 min** (repo público → Actions gratis). Reduce mucho los cold starts.
+  **Limitación:** el cron de GitHub es best-effort y puede demorarse/omitirse en picos, así que no los
+  elimina al 100%. Para algo más estricto: sumar **UptimeRobot** (free, cada 5 min a `/health`) o pasar
+  a un **plan pago de Render** (elimina el spin-down de raíz).
 
 ### PERF-02 — N+1 en el listado de asistencias de una sesión
 - **Ubicación:** `backend/src/Mambo.Api/Controllers/SessionsController.cs:70-80`

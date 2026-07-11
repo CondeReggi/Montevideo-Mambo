@@ -1138,3 +1138,16 @@ FIX [F6] enum.ToString() en Selects traducidos a SQL: en Postgres devolvía la
       Bajos: AsNoTracking, pooler de Supabase, compresion de respuestas, Cache-Control,
       recomputo de saldo. Los indices de Postgres (db/003) YA cubren las queries calientes.
       Nota: es SOLO analisis + to-do; no se aplicaron cambios de codigo.
+
+--------------------------------------------------------------------------
+2026-07-11 — PERF-01: keep-alive del backend (GitHub Action)
+--------------------------------------------------------------------------
+[E49] Se agrego .github/workflows/keep-alive.yml: cron cada 5 min (repo publico ->
+      Actions gratis) que pinguea https://mambo-api.onrender.com/health con reintentos.
+      Objetivo: evitar los cold starts de Render free (se apaga tras ~15 min sin trafico;
+      el primer hit tarda ~30-60s). Mitiga PERF-01. LIMITACION: el cron de GitHub es
+      best-effort y puede demorarse/omitirse, asi que no elimina los cold starts al 100%;
+      para algo mas estricto, UptimeRobot o plan pago de Render. Se puede sobreescribir la
+      URL con la repo variable KEEPALIVE_URL. VERIFICADO: /health responde 200; la logica
+      del ping funciona. El primer run programado puede tardar unos minutos en aparecer en
+      la pestana Actions (los workflows nuevos con cron demoran en activarse).

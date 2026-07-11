@@ -1,0 +1,47 @@
+name: keep-alive
+
+# PERF-01: mantiene "despierto" el backend en Render (plan free) para evitar los cold
+# starts (~30-60 s). Render apaga el servicio tras ~15 min sin trafico entrante; este ping
+# periodico lo mantiene vivo.
+#
+# Nota: el cron de GitHub Actions es "best-effort" y puede demorarse/omitirse en picos de
+# carga, asi que REDUCE mucho los cold starts pero no los elimina al 100%. Para algo mas
+# estricto, sumar un uptime externo (UptimeRobot free, cada 5 min) apuntando a /health.
+#
+# El repo es publico -> minutos de Actions gratis/ilimitados, por eso se corre cada 5 min.
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"   # cada 5 minutos (UTC)
+  workflow_dispatch: {}      # permite dispararlo a mano desde la pestaña Actions
+
+# Evita que se solapen dos corridas si una tardo (p. ej. durante un cold start largo).
+concurrency:
+  group: keep-alive
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping /health
+        env:
+          # Se puede sobreescribir con una repo variable KEEPALIVE_URL (Settings -> Variables).
+          KEEPALIVE_URL: ${{ vars.KEEPALIVE_URL }}
+        run: |
+          URL="${KEEPALIVE_URL:-https://mambo-api.onrender.com/health}"
+          echo "Pinging $URL"
+          # El primer hit puede cold-startar (~60 s); reintentamos con margen.
+          for i in 1 2 3 4 5; do
+            code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 90 "$URL" || echo "000")
+            echo "intento $i -> HTTP $code"
+            if [ "$code" = "200" ]; then
+              echo "Backend despierto."
+              exit 0
+            fi
+            sleep 15
+          done
+          # Best-effort: no marcamos el job como fallido si el backend tarda o esta arrancando,
+          # para no generar ruido de fallos. Un fallo persistente aca conviene revisarlo aparte.
+          echo "::warning::El backend no respondio 200 tras varios intentos (puede estar arrancando)."
