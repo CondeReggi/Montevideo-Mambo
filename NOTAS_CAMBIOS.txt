@@ -1118,3 +1118,23 @@ FIX [F6] enum.ToString() en Selects traducidos a SQL: en Postgres devolvía la
       relativo al header (64px) en vez del viewport. Solucion: renderizar el drawer en un
       PORTAL a document.body (createPortal), fuera del header, con z-[100]. Ahora cubre
       todo el alto desde arriba del todo. Build OK.
+
+--------------------------------------------------------------------------
+2026-07-11 — Analisis de rendimiento + to-do (ANALISIS_RENDIMIENTO.md)
+--------------------------------------------------------------------------
+[E48] Se documentaron 16 items de rendimiento (PERF-01..16) con impacto, ubicacion
+      (archivo:linea) y recomendacion, mas una tabla de control (Estado) y un plan por
+      costo/beneficio, en ANALISIS_RENDIMIENTO.md. Causas principales de la lentitud:
+      - PERF-01 (ALTO): Render plan FREE -> cold starts (~30-60s tras inactividad) +
+        0.1 vCPU/512MB. Es casi seguro la causa #1 de la lentitud intermitente. Fix
+        rapido: keep-alive (ping a /health cada ~10 min).
+      - PERF-02 (ALTO): N+1 en sessions/{id}/attendances (resumen + signed URL por fila).
+      - PERF-03 (ALTO): la CSP con nonce (SEC-21) volvio TODAS las rutas dinamicas -> las
+        paginas publicas perdieron cacheo estatico/CDN en Vercel (regresion a decidir:
+        trade-off seguridad<->rendimiento).
+      Medios: StudentSummaryService (~5 queries+HTTP), signed URLs sin cache, listados sin
+      paginacion, dashboard admin (5 requests, recalculo sin cache), passes consultado 2x,
+      sin cache de datos casi estaticos, fetch-on-mount sin SSR/cache.
+      Bajos: AsNoTracking, pooler de Supabase, compresion de respuestas, Cache-Control,
+      recomputo de saldo. Los indices de Postgres (db/003) YA cubren las queries calientes.
+      Nota: es SOLO analisis + to-do; no se aplicaron cambios de codigo.
