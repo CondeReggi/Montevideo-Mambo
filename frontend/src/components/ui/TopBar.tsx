@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Logo } from "./Logo";
@@ -71,7 +72,8 @@ export function TopBar() {
   const isActive = (href: string) => pathname === href || (href !== "/admin" && pathname.startsWith(href));
 
   return (
-    <header className="sticky top-0 z-40 border-b border-ink-500/60 bg-ink-900/80 backdrop-blur-md">
+    <>
+      <header className="sticky top-0 z-40 border-b border-ink-500/60 bg-ink-900/80 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4">
         {/* Burger (solo móvil) */}
         {items.length > 0 && (
@@ -143,9 +145,14 @@ export function TopBar() {
         </div>
       </div>
 
-      {/* Menú lateral (drawer) móvil */}
-      {menuOpen && items.length > 0 && (
-        <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true" aria-label="Menú">
+      </header>
+
+      {/* Menú lateral (drawer) móvil — se renderiza en un PORTAL a document.body para
+          escapar el containing block que crea el backdrop-filter del header; si no, el
+          `fixed` se posiciona relativo al header y no cubre toda la pantalla. */}
+      {menuOpen && items.length > 0 && typeof document !== "undefined" &&
+        createPortal(
+          <div className="fixed inset-0 z-[100] md:hidden" role="dialog" aria-modal="true" aria-label="Menú">
           <div
             className="absolute inset-0 animate-fade-in bg-black/60 backdrop-blur-sm"
             onClick={() => setMenuOpen(false)}
@@ -221,9 +228,10 @@ export function TopBar() {
               </button>
             </div>
           </div>
-        </div>
-      )}
-    </header>
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }
 

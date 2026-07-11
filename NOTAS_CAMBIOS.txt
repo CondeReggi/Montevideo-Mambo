@@ -1113,3 +1113,8 @@ FIX [F6] enum.ToString() en Selects traducidos a SQL: en Postgres devolvía la
       bloquea el scroll de fondo mientras esta abierto. En >=md se mantiene la barra
       horizontal + acciones a la derecha (los iconos settings/logout se ocultan en mobile
       porque viven en el drawer). Se agrego IconMenu y la animacion slide-in-left. Build OK.
+      FIX: el drawer no cubria toda la pantalla porque el <header> tiene backdrop-blur
+      (backdrop-filter), que crea un containing block y hacia que el `fixed` se posicione
+      relativo al header (64px) en vez del viewport. Solucion: renderizar el drawer en un
+      PORTAL a document.body (createPortal), fuera del header, con z-[100]. Ahora cubre
+      todo el alto desde arriba del todo. Build OK.
