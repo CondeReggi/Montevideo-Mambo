@@ -23,9 +23,9 @@ export default function Home() {
   const isStudent = session?.roles.includes("student");
 
   return (
-    <main className="relative min-h-screen overflow-hidden">
+    <main className="relative min-h-screen overflow-hidden bg-ink bg-hero-grad">
       {/* Hero */}
-      <section className="relative bg-hero-grad">
+      <section className="relative">
         <div className="mx-auto max-w-6xl px-5 pb-16 pt-14 sm:pt-20">
           <div className="flex flex-col items-center text-center animate-fade-up">
             <LogoMark className="h-20 w-20 drop-shadow-[0_0_30px_rgba(196,248,43,0.6)] sm:h-24 sm:w-24" />
