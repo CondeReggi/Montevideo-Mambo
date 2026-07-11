@@ -1151,3 +1151,21 @@ FIX [F6] enum.ToString() en Selects traducidos a SQL: en Postgres devolvía la
       URL con la repo variable KEEPALIVE_URL. VERIFICADO: /health responde 200; la logica
       del ping funciona. El primer run programado puede tardar unos minutos en aparecer en
       la pestana Actions (los workflows nuevos con cron demoran en activarse).
+
+--------------------------------------------------------------------------
+2026-07-11 — PERF-05 + PERF-02: cache de signed URLs + fin del N+1
+--------------------------------------------------------------------------
+[E50] PERF-05: SupabasePhotoStorage cachea la signed URL de cada foto en IMemoryCache
+      (AddMemoryCache en DI) por la mitad del TTL (~150s), clave signedurl:{bucket}:{path}.
+      Evita el POST HTTP a Supabase por cada foto en cada render. Se agrego el paquete
+      Microsoft.Extensions.Caching.Memory 8.0.1 a Infrastructure.
+[E51] PERF-02: nuevo StudentSummaryService.GetManyAsync(studentIds) que arma los resumenes
+      de varios alumnos en 4 queries FIJAS (students, passes, no-cubiertas agrupadas,
+      pendientes agrupadas) + fotos en paralelo (Task.WhenAll, ya cacheadas). Sessions
+      Controller.Attendances lo usa en vez del foreach que llamaba GetAsync por fila
+      (antes ~5xN queries + N HTTP -> ahora O(1) queries). GetAsync (single) reusa el batch.
+      VERIFICADO E2E: /api/sessions/{id}/attendances devuelve HTTP 200 con los resumenes
+      correctos (Ana classesRemaining 7, Leo 0, segun seed); /me/panel sigue 200; build y
+      12 tests de dominio OK; sin errores en log. Misma forma de respuesta para el front.
+      NOTA dev: hay que reiniciar mambo_dev.db si el seed quedo fechado otro dia (la sesion
+      demo se crea para "hoy").

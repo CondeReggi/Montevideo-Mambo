@@ -21,10 +21,10 @@ Cada ítem tiene: **ID**, impacto, ubicación (`archivo:línea`), qué pasa y la
 | ID | Impacto | Título | Estado |
 |---|---|---|---|
 | PERF-01 | 🔴 | Render **free**: cold starts (~30–60 s) + 0.1 vCPU / 512 MB | 🟡 Mitigado (keep-alive, 2026-07-11) |
-| PERF-02 | 🔴 | N+1 en `sessions/{id}/attendances` (resumen + signed URL por fila) | Pendiente |
+| PERF-02 | 🔴 | N+1 en `sessions/{id}/attendances` (resumen + signed URL por fila) | ✅ Resuelto (2026-07-11) |
 | PERF-03 | 🔴 | La CSP con nonce volvió **todas** las rutas dinámicas (regresión) | Pendiente |
 | PERF-04 | 🟠 | `StudentSummaryService`: ~5 queries + 1 HTTP por llamada | Pendiente |
-| PERF-05 | 🟠 | Signed URLs de fotos sin caché (HTTP a Supabase por foto/render) | Pendiente |
+| PERF-05 | 🟠 | Signed URLs de fotos sin caché (HTTP a Supabase por foto/render) | ✅ Resuelto (2026-07-11) |
 | PERF-06 | 🟠 | Listados sin paginación (students, classes, debtors, payments) | Pendiente |
 | PERF-07 | 🟠 | Dashboard admin: 5 requests; alerts/debtors recalculan sin caché | Pendiente |
 | PERF-08 | 🟠 | `StudentPanelService` consulta `passes` dos veces | Pendiente |
@@ -71,6 +71,12 @@ Cada ítem tiene: **ID**, impacto, ubicación (`archivo:línea`), qué pasa y la
 - **Recomendación:** traer los resúmenes de todos los alumnos de la sesión en **1–2 queries** (join /
   `IN (...)`), y resolver las fotos en lote (ver PERF-05). Idealmente un método
   `GetSummariesAsync(IEnumerable<Guid> studentIds)` que agregue por grupo.
+- **✅ Resolución (2026-07-11):** nuevo `StudentSummaryService.GetManyAsync(studentIds)` que arma los
+  resúmenes en **4 queries fijas** (students, passes, no-cubiertas agrupadas, pendientes agrupadas) sin
+  importar cuántos alumnos, y resuelve las fotos **en paralelo** (`Task.WhenAll`, ya cacheadas por
+  PERF-05). `SessionsController.Attendances` lo usa en vez del `foreach` (antes ~5×N queries + N HTTP).
+  `GetAsync` (single) ahora reusa el batch. Verificado E2E: el endpoint devuelve los resúmenes correctos
+  (saldos por alumno) con la misma forma de respuesta; `/me/panel` sigue OK.
 
 ### PERF-03 — La CSP con nonce volvió todas las rutas dinámicas (regresión propia)
 - **Ubicación:** `frontend/src/middleware.ts` + `frontend/src/app/layout.tsx` (lee `headers()`)
@@ -108,6 +114,9 @@ Cada ítem tiene: **ID**, impacto, ubicación (`archivo:línea`), qué pasa y la
   por render (y N veces en listados). La URL firmada dura 300 s pero **no se reutiliza**.
 - **Recomendación:** cachear la signed URL por `photoPath` en memoria (`IMemoryCache`) durante ~la
   mitad del TTL. Elimina casi todos los round-trips de fotos. (Ataca también PERF-02.)
+- **✅ Resolución (2026-07-11):** `SupabasePhotoStorage` ahora usa `IMemoryCache` (registrado con
+  `AddMemoryCache`): cachea la signed URL por `signedurl:{bucket}:{path}` durante **la mitad del TTL**
+  (≈150 s). Renders repetidos y listados dejan de pegarle a Supabase por cada foto.
 
 ### PERF-06 — Listados sin paginación
 - **Ubicación:** `AdminController` (`ListStudents`, `ListTeachers`, `ListClasses`), `BillingService`

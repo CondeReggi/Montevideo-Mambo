@@ -55,6 +55,7 @@ public static class DependencyInjection
         services.AddSingleton<IClock, SystemClock>();
         services.AddScoped<IAuditService, AuditService>();
         services.AddHttpClient();
+        services.AddMemoryCache(); // PERF-05: caché de signed URLs de fotos.
         services.AddScoped<IPhotoStorage, SupabasePhotoStorage>();
         services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
         services.AddSingleton<IJwtIssuer, JwtIssuer>();

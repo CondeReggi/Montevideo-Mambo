@@ -66,18 +66,15 @@ public class SessionsController(
             .Select(a => new { a.Id, a.StudentId, a.Status, a.Source, a.CheckedInAt, a.IsAmbiguous })
             .ToListAsync(ct);
 
-        // Enriquecer con el resumen del alumno (foto firmada + saldo).
-        var items = new List<object>(rows.Count);
-        foreach (var r in rows)
+        // PERF-02: resúmenes de todos los alumnos en pocas queries (antes era 1 por fila = N+1).
+        var summaryByStudent = await summaries.GetManyAsync(rows.Select(r => r.StudentId).ToList(), ct);
+
+        var items = rows.Select(r => (object)new
         {
-            var s = await summaries.GetAsync(r.StudentId, ct);
-            items.Add(new
-            {
-                r.Id, r.StudentId, status = r.Status.ToString(), source = r.Source.ToString(),
-                r.CheckedInAt, r.IsAmbiguous,
-                student = s
-            });
-        }
+            r.Id, r.StudentId, status = r.Status.ToString(), source = r.Source.ToString(),
+            r.CheckedInAt, r.IsAmbiguous,
+            student = summaryByStudent.GetValueOrDefault(r.StudentId)
+        }).ToList();
         return Ok(items);
     }
 }

@@ -25,42 +25,75 @@ public class StudentSummaryService(IMamboDbContext db, IPhotoStorage photos, ICl
 {
     public async Task<StudentSummary?> GetAsync(Guid studentId, CancellationToken ct = default)
     {
-        var student = await db.Students
-            .Where(s => s.Id == studentId)
-            .Select(s => new { s.Id, s.User.FullName, s.PhotoPath })
-            .FirstOrDefaultAsync(ct);
-        if (student is null) return null;
+        var many = await GetManyAsync(new[] { studentId }, ct);
+        return many.GetValueOrDefault(studentId);
+    }
+
+    /// <summary>
+    /// PERF-02: resúmenes de VARIOS alumnos en pocas queries (evita el N+1 del listado de
+    /// asistencias). Los datos se agregan por consultas agrupadas y las fotos (signed URLs,
+    /// ya cacheadas en PERF-05) se resuelven en paralelo. Devuelve un mapa por studentId.
+    /// </summary>
+    public async Task<Dictionary<Guid, StudentSummary>> GetManyAsync(
+        IReadOnlyCollection<Guid> studentIds, CancellationToken ct = default)
+    {
+        var ids = studentIds.Distinct().ToList();
+        if (ids.Count == 0) return new Dictionary<Guid, StudentSummary>();
 
         var today = clock.LocalToday();
-        var passes = await db.Passes
-            .Where(p => p.StudentId == studentId)
-            .Select(p => new { p.Kind, p.Status, p.Balance, p.ValidFrom, p.ValidTo, p.IsPaid, Price = p.PassType.Price })
+
+        var students = await db.Students
+            .Where(s => ids.Contains(s.Id))
+            .Select(s => new { s.Id, s.User.FullName, s.PhotoPath })
             .ToListAsync(ct);
 
-        // Deuda de DINERO: cuponeras entregadas sin pagar (no canceladas).
-        var debtMoney = passes.Where(p => !p.IsPaid && p.Status != PassStatus.Cancelled).Sum(p => p.Price);
+        var passes = await db.Passes
+            .Where(p => ids.Contains(p.StudentId))
+            .Select(p => new { p.StudentId, p.Kind, p.Status, p.Balance, p.ValidFrom, p.ValidTo, p.IsPaid, Price = p.PassType.Price })
+            .ToListAsync(ct);
+        var passesByStudent = passes.ToLookup(p => p.StudentId);
 
-        var classesRemaining = passes
-            .Where(p => p.Kind == PassKind.ClassPack && p.Status == PassStatus.Active
-                        && p.ValidTo >= today && p.Balance > 0)
-            .Sum(p => p.Balance);
+        // Asistencias confirmadas no cubiertas (deuda implícita D12) y pendientes, agrupadas.
+        var uncovered = (await db.Attendances
+            .Where(a => ids.Contains(a.StudentId) && a.Status == AttendanceStatus.Confirmed
+                        && a.PassId == null && !a.CoveredByUnlimited)
+            .GroupBy(a => a.StudentId)
+            .Select(g => new { StudentId = g.Key, Count = g.Count() })
+            .ToListAsync(ct))
+            .ToDictionary(x => x.StudentId, x => x.Count);
 
-        var hasUnlimited = passes.Any(p => p.Kind == PassKind.UnlimitedMonth
-            && p.Status == PassStatus.Active && today >= p.ValidFrom && today <= p.ValidTo);
+        var pending = (await db.Attendances
+            .Where(a => ids.Contains(a.StudentId) && a.Status == AttendanceStatus.Pending)
+            .GroupBy(a => a.StudentId)
+            .Select(g => new { StudentId = g.Key, Count = g.Count() })
+            .ToListAsync(ct))
+            .ToDictionary(x => x.StudentId, x => x.Count);
 
-        var negativeBalances = passes.Where(p => p.Balance < 0).Sum(p => -p.Balance);
+        // Fotos en paralelo (no tocan la BD; la signed URL viene cacheada por PERF-05).
+        var photoTasks = students.ToDictionary(
+            s => s.Id,
+            s => photos.GetReadSignedUrlAsync(s.PhotoPath, ct: ct));
+        await Task.WhenAll(photoTasks.Values);
 
-        // Asistencias confirmadas no cubiertas (sin cuponera ni pase libre) = deuda implícita (D12).
-        var uncovered = await db.Attendances.CountAsync(a =>
-            a.StudentId == studentId && a.Status == AttendanceStatus.Confirmed
-            && a.PassId == null && !a.CoveredByUnlimited, ct);
+        var result = new Dictionary<Guid, StudentSummary>(students.Count);
+        foreach (var s in students)
+        {
+            var ps = passesByStudent[s.Id];
+            var debtMoney = ps.Where(p => !p.IsPaid && p.Status != PassStatus.Cancelled).Sum(p => p.Price);
+            var classesRemaining = ps
+                .Where(p => p.Kind == PassKind.ClassPack && p.Status == PassStatus.Active
+                            && p.ValidTo >= today && p.Balance > 0)
+                .Sum(p => p.Balance);
+            var hasUnlimited = ps.Any(p => p.Kind == PassKind.UnlimitedMonth
+                && p.Status == PassStatus.Active && today >= p.ValidFrom && today <= p.ValidTo);
+            var negativeBalances = ps.Where(p => p.Balance < 0).Sum(p => -p.Balance);
 
-        var pending = await db.Attendances.CountAsync(a =>
-            a.StudentId == studentId && a.Status == AttendanceStatus.Pending, ct);
-
-        var photoUrl = await photos.GetReadSignedUrlAsync(student.PhotoPath, ct: ct);
-
-        return new StudentSummary(student.Id, student.FullName, photoUrl,
-            classesRemaining, hasUnlimited, negativeBalances + uncovered, pending, debtMoney);
+            result[s.Id] = new StudentSummary(
+                s.Id, s.FullName, await photoTasks[s.Id],
+                classesRemaining, hasUnlimited,
+                negativeBalances + uncovered.GetValueOrDefault(s.Id),
+                pending.GetValueOrDefault(s.Id), debtMoney);
+        }
+        return result;
     }
 }
