@@ -5,6 +5,8 @@ import Link from "next/link";
 import { getPublicSchedule } from "@/lib/api";
 import { WD } from "@/lib/horarios";
 import { IconPin, IconPhone, IconClock, IconChevron } from "@/components/ui/Icons";
+import { SocialLinks } from "@/components/SiteFooter";
+import { SITE } from "@/lib/site";
 
 // Grilla fija de marca (fallback si el backend no está disponible).
 const FALLBACK_TIMES = ["18:30", "19:30", "20:30", "21:30"];
@@ -136,13 +138,14 @@ export default function HorariosGrid() {
               ))}
             </div>
           </div>
-          <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 border-t border-ink-500/50 pt-4 text-sm text-muted-soft">
-            <span className="inline-flex items-center gap-2">
-              <IconPin /> Pablo de María 1474 esq. Brandzen
-            </span>
-            <span className="inline-flex items-center gap-2">
-              <IconPhone /> 092 136 401
-            </span>
+          <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-ink-500/50 pt-4 text-sm text-muted-soft">
+            <a href={SITE.mapsUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 transition hover:text-lime">
+              <IconPin /> {SITE.address}
+            </a>
+            <a href={SITE.phoneHref} className="inline-flex items-center gap-2 transition hover:text-lime">
+              <IconPhone /> {SITE.phoneDisplay}
+            </a>
+            <SocialLinks className="ml-auto" />
           </div>
         </div>
       </div>

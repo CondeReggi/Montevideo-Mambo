@@ -34,3 +34,41 @@ self.addEventListener("fetch", (e) => {
       ),
   );
 });
+
+// ---- Notificaciones push (Web Push) --------------------------------------
+// El backend envía un payload JSON { title, body, url, tag }. Se muestra como
+// notificación del sistema; al tocarla se abre (o enfoca) la app en 'url'.
+self.addEventListener("push", (e) => {
+  let data = {};
+  try {
+    data = e.data ? e.data.json() : {};
+  } catch (_) {
+    data = { title: "MAMBO", body: e.data ? e.data.text() : "" };
+  }
+  const title = data.title || "Montevideo MAMBO";
+  const options = {
+    body: data.body || "",
+    icon: "/icon-192.png",
+    badge: "/icon-192.png",
+    tag: data.tag || undefined,
+    data: { url: data.url || "/" },
+  };
+  e.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || "/";
+  e.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+      // Si ya hay una ventana de la app abierta, la enfoca y navega.
+      for (const c of list) {
+        if ("focus" in c) {
+          c.navigate(url).catch(() => {});
+          return c.focus();
+        }
+      }
+      return self.clients.openWindow(url);
+    }),
+  );
+});

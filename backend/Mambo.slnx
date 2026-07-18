@@ -6,6 +6,7 @@
     <Project Path="src/Mambo.Infrastructure/Mambo.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Mambo.Application.Tests/Mambo.Application.Tests.csproj" />
     <Project Path="tests/Mambo.Domain.Tests/Mambo.Domain.Tests.csproj" />
   </Folder>
 </Solution>

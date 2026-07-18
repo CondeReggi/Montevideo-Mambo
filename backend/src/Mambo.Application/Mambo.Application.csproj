@@ -6,6 +6,13 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.10" />
+    <!-- ExecuteUpdateAsync (reclamo atómico al confirmar). Agnóstico del proveedor. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="8.0.10" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Permite testear la recuperación ante la carrera de check-in (TryInsertAsync). -->
+    <InternalsVisibleTo Include="Mambo.Application.Tests" />
   </ItemGroup>
 
   <PropertyGroup>

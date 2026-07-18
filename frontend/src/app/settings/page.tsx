@@ -7,9 +7,10 @@ import { Shell, PageHeader } from "@/components/ui/TopBar";
 import { Card, Button, Badge } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 import { IconDownload, IconCheck, IconShare, IconGear } from "@/components/ui/Icons";
+import PushSettings from "@/components/PushSettings";
 
 export default function SettingsPage() {
-  const { ready } = useAuth();
+  const { ready, session } = useAuth();
   const toast = useToast();
   const { canPrompt, isIOS, installed, promptInstall } = usePwaInstall();
   const [busy, setBusy] = useState(false);
@@ -95,6 +96,9 @@ export default function SettingsPage() {
           <Badge tone="muted">Se muestra al abrir la app</Badge>
         </div>
       </Card>
+
+      {/* Notificaciones push (aparece solo si el backend las tiene habilitadas) */}
+      <PushSettings isAdmin={session?.roles.includes("admin") ?? false} />
     </Shell>
   );
 }

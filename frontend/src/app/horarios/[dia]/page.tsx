@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Logo } from "@/components/ui/Logo";
 import { IconArrowLeft, IconClock, IconPin, IconPhone } from "@/components/ui/Icons";
+import { SocialLinks } from "@/components/SiteFooter";
+import { SITE } from "@/lib/site";
 import { getPublicSchedule } from "@/lib/api";
 import { WD, FALLBACK_SCHEDULE, classDescription, SchedClass } from "@/lib/horarios";
 
@@ -88,9 +90,16 @@ export default function DiaDetalle() {
           </div>
         )}
 
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-muted-soft">
-          <span className="inline-flex items-center gap-2"><IconPin /> Pablo de María 1474 esq. Brandzen</span>
-          <span className="inline-flex items-center gap-2"><IconPhone /> 092 136 401</span>
+        <div className="mt-8 flex flex-col items-center gap-3 text-sm text-muted-soft">
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
+            <a href={SITE.mapsUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 transition hover:text-lime">
+              <IconPin /> {SITE.address}
+            </a>
+            <a href={SITE.phoneHref} className="inline-flex items-center gap-2 transition hover:text-lime">
+              <IconPhone /> {SITE.phoneDisplay}
+            </a>
+          </div>
+          <SocialLinks />
         </div>
 
         <div className="mt-8 text-center">

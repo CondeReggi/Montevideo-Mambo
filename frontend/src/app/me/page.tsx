@@ -9,10 +9,12 @@ import {
 import { Shell, PageHeader } from "@/components/ui/TopBar";
 import { Card, Stat, Badge, Button, Skeleton, Avatar } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
-import { IconTicket, IconCalendar, IconCash, IconQr, IconCamera, IconClock, IconX } from "@/components/ui/Icons";
+import { IconTicket, IconCalendar, IconCash, IconQr, IconCamera, IconClock, IconX, IconSpark } from "@/components/ui/Icons";
 import { PassBadge, StatusBadge, fmtDate, kindLabel, debtDisplay } from "@/components/format";
 import StudentQr from "@/components/StudentQr";
 import QrScanner from "@/components/QrScanner";
+import BuyPass from "@/components/BuyPass";
+import ContentFeed from "@/components/ContentFeed";
 import AlertsBanner, { criticalPassIds, warnPassIds } from "@/components/AlertsBanner";
 import { useRegisterRefresh } from "@/components/Refresh";
 
@@ -165,6 +167,14 @@ export default function MyPanel() {
               <StudentQr code={myQr.qrFixedCode} name={myQr.fullName} />
             </Card>
           )}
+
+          {/* Comprar cuponera (Mercado Pago; muestra "próximamente" si no está configurado) */}
+          <BuyPass onPurchased={loadPanel} />
+
+          {/* Novedades de la academia (contenidos publicados) */}
+          <Section title="Novedades" icon={<IconSpark />}>
+            <ContentFeed compact />
+          </Section>
 
           <Section title="Cuponeras" icon={<IconTicket />}>
             {panel.passes.length === 0 && <EmptyRow text="No tenés cuponeras activas." />}

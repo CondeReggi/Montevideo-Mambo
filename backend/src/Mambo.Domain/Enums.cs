@@ -18,5 +18,14 @@ public enum PassStatus { Active, Expired, Exhausted, Cancelled }
 /// <summary>Estado de un pago manual.</summary>
 public enum PaymentStatus { Pending, Confirmed, Cancelled }
 
+/// <summary>
+/// Estado de un intento de compra por pasarela. Espeja los estados de Mercado Pago:
+/// pending (esperando), approved (acreditado), rejected (rechazado), cancelled (cancelado/expirado).
+/// </summary>
+public enum PaymentIntentStatus { Pending, Approved, Rejected, Cancelled }
+
 /// <summary>Razón de un movimiento del ledger de cuponera.</summary>
 public enum LedgerReason { Consume, PurchaseCredit, ManualAdjust, Extension, CorrectionReverse }
+
+/// <summary>Tipo de contenido de difusión (noticias, novedades, muestras, talleres, eventos).</summary>
+public enum ContentType { News, Update, Showcase, Workshop, Event }

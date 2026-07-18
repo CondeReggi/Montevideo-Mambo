@@ -20,6 +20,9 @@ public interface IMamboDbContext
     DbSet<PassLedgerEntry> LedgerEntries { get; }
     DbSet<Attendance> Attendances { get; }
     DbSet<Payment> Payments { get; }
+    DbSet<PaymentIntent> PaymentIntents { get; }
+    DbSet<Content> Contents { get; }
+    DbSet<PushSubscription> PushSubscriptions { get; }
     DbSet<QrToken> QrTokens { get; }
     DbSet<AuditLog> AuditLogs { get; }
     DbSet<RefreshToken> RefreshTokens { get; }

@@ -16,7 +16,9 @@ public record PendingPaymentDto(Guid Id, Guid StudentId, string FullName, decima
 /// Gestión de cuponeras y pagos (rol admin). Toda alta de crédito pasa por el ledger
 /// inmutable (R7); nunca se editan filas existentes. Los pagos son manuales (sin pasarela).
 /// </summary>
-public class BillingService(IMamboDbContext db, IClock clock, IAuditService audit)
+// PushService opcional (nullable): en producción lo inyecta el contenedor; en los
+// tests no hace falta (las notificaciones son best-effort).
+public class BillingService(IMamboDbContext db, IClock clock, IAuditService audit, PushService? push = null)
 {
     public async Task<List<PassTypeDto>> ListPassTypesAsync(CancellationToken ct = default)
     {
@@ -35,14 +37,30 @@ public class BillingService(IMamboDbContext db, IClock clock, IAuditService audi
     public async Task<Guid> AssignPassAsync(AssignPassInput i, Guid actor, CancellationToken ct = default)
     {
         await using var tx = await db.Database.BeginTransactionAsync(ct);
+        var (passId, _) = await AssignPassCoreAsync(i, actor, ct);
+        await tx.CommitAsync(ct);
+        return passId;
+    }
 
+    /// <summary>
+    /// Núcleo de la entrega de una cuponera, SIN transacción propia: la abre quien llama.
+    /// Lo reusa el checkout por pasarela, que necesita entregar la cuponera y marcar el
+    /// intento como aprobado en la MISMA transacción (si no, un corte a mitad dejaría la
+    /// cuponera entregada y el intento sin marcar, y el reintento del webhook la duplicaría).
+    /// Devuelve (passId, paymentId).
+    /// </summary>
+    internal async Task<(Guid PassId, Guid? PaymentId)> AssignPassCoreAsync(
+        AssignPassInput i, Guid actor, CancellationToken ct = default)
+    {
         var type = await db.PassTypes.FirstOrDefaultAsync(t => t.Id == i.PassTypeId, ct)
             ?? throw new InvalidOperationException("Tipo de cuponera no encontrado.");
-        if (!await db.Students.AnyAsync(s => s.Id == i.StudentId, ct))
-            throw new InvalidOperationException("Alumno no encontrado.");
+        if (!await db.Students.AnyAsync(s => s.Id == i.StudentId && s.IsActive, ct))
+            throw new InvalidOperationException("Alumno no encontrado o inactivo.");
 
         var today = clock.LocalToday();
         var now = clock.UtcNow;
+
+        await EnsureNoActiveDuplicateAsync(i.StudentId, type, today, ct);
         var credit = type.Kind == PassKind.UnlimitedMonth ? 0 : (type.ClassCount ?? 1);
 
         var pass = new Pass
@@ -100,8 +118,27 @@ public class BillingService(IMamboDbContext db, IClock clock, IAuditService audi
 
         audit.Record(actor, "assign_pass", "pass", pass.Id, new { type.Name, credit, i.RegisterPayment });
         await db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
-        return pass.Id;
+        return (pass.Id, paymentId);
+    }
+
+    /// <summary>
+    /// Impide entregar una cuponera si el alumno YA tiene una ACTIVA y VIGENTE del mismo tipo.
+    /// Evita la doble compra por error (y, con Mercado Pago, que un reintento del alumno o un
+    /// webhook repetido le cobren dos veces lo mismo). Otros tipos se pueden acumular: el
+    /// consumo es FIFO por vencimiento.
+    /// </summary>
+    private async Task EnsureNoActiveDuplicateAsync(Guid studentId, PassType type, DateOnly today, CancellationToken ct)
+    {
+        var yaTiene = await db.Passes.AnyAsync(p =>
+            p.StudentId == studentId &&
+            p.PassTypeId == type.Id &&
+            p.Status == PassStatus.Active &&
+            p.ValidFrom <= today && p.ValidTo >= today, ct);
+
+        if (yaTiene)
+            throw new InvalidOperationException(
+                $"El alumno ya tiene una cuponera activa y vigente de tipo \"{type.Name}\". " +
+                "Se puede extender la existente o esperar a que venza.");
     }
 
     /// <summary>Cobra una cuponera que se había entregado impaga (registra el pago y la marca paga).</summary>
@@ -233,6 +270,16 @@ public class BillingService(IMamboDbContext db, IClock clock, IAuditService audi
         audit.Record(actor, "confirm_payment", "payment", payment.Id, new { payment.Amount });
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
+
+        // Aviso al alumno fuera de la transacción (best-effort).
+        if (push is not null)
+        {
+            var userId = await db.Students.Where(s => s.Id == payment.StudentId)
+                .Select(s => s.UserId).FirstOrDefaultAsync(ct);
+            if (userId != Guid.Empty)
+                await push.SendToUserAsync(userId,
+                    new PushMessage("Pago confirmado", $"Registramos tu pago de ${payment.Amount:0}. ¡Gracias! 💚", "/me", "payment"), ct);
+        }
     }
 
     /// <summary>Cancela un pago pendiente (no se puede cancelar uno ya confirmado).</summary>

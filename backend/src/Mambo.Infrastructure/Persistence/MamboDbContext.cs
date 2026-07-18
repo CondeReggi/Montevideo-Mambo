@@ -20,6 +20,9 @@ public class MamboDbContext(DbContextOptions<MamboDbContext> options) : DbContex
     public DbSet<PassLedgerEntry> LedgerEntries => Set<PassLedgerEntry>();
     public DbSet<Attendance> Attendances => Set<Attendance>();
     public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<PaymentIntent> PaymentIntents => Set<PaymentIntent>();
+    public DbSet<Content> Contents => Set<Content>();
+    public DbSet<PushSubscription> PushSubscriptions => Set<PushSubscription>();
     public DbSet<QrToken> QrTokens => Set<QrToken>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
@@ -36,6 +39,7 @@ public class MamboDbContext(DbContextOptions<MamboDbContext> options) : DbContex
             b.HasPostgresEnum<PassKind>("pass_kind");
             b.HasPostgresEnum<PassStatus>("pass_status");
             b.HasPostgresEnum<PaymentStatus>("payment_status");
+            b.HasPostgresEnum<PaymentIntentStatus>("payment_intent_status");
             b.HasPostgresEnum<LedgerReason>("ledger_reason");
         }
 
@@ -142,6 +146,33 @@ public class MamboDbContext(DbContextOptions<MamboDbContext> options) : DbContex
             e.HasOne(x => x.Session).WithMany(x => x.Attendances).HasForeignKey(x => x.ClassSessionId);
         });
 
+        b.Entity<PaymentIntent>(e =>
+        {
+            e.ToTable("payment_intent");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Status).HasColumnType("payment_intent_status");
+            e.Property(x => x.Amount).HasColumnType("numeric(10,2)");
+            e.HasIndex(x => new { x.StudentId, x.Status });
+
+            // IDEMPOTENCIA ANTE WEBHOOKS REPETIDOS: un pago de la pasarela se procesa una
+            // sola vez. Es la garantía DURA (la de app puede perder una carrera).
+            // Los NULL no chocan entre sí: los intentos aún sin pagar no se estorban.
+            e.HasIndex(x => x.ExternalPaymentId).IsUnique();
+
+            e.HasOne(x => x.Student).WithMany().HasForeignKey(x => x.StudentId);
+            e.HasOne(x => x.PassType).WithMany().HasForeignKey(x => x.PassTypeId);
+        });
+
+        b.Entity<Content>(e =>
+        {
+            e.ToTable("content");
+            e.HasKey(x => x.Id);
+            // Tipo como TEXTO (no enum de PG): legible en la BD, igual en SQLite y Postgres,
+            // y sin el problema de las etiquetas snake_case de los enums de PG (fix F6).
+            e.Property(x => x.Type).HasConversion<string>().HasMaxLength(20);
+            e.HasIndex(x => new { x.IsPublished, x.Type });
+        });
+
         b.Entity<Payment>(e =>
         {
             e.ToTable("payment");
@@ -150,6 +181,17 @@ public class MamboDbContext(DbContextOptions<MamboDbContext> options) : DbContex
             e.Property(x => x.Amount).HasColumnType("numeric(10,2)");
             e.HasIndex(x => new { x.StudentId, x.Status });
             e.HasOne(x => x.Student).WithMany(x => x.Payments).HasForeignKey(x => x.StudentId);
+        });
+
+        b.Entity<PushSubscription>(e =>
+        {
+            e.ToTable("push_subscription");
+            e.HasKey(x => x.Id);
+            // Endpoint único: un dispositivo/navegador = una fila; re-suscribir actualiza.
+            e.HasIndex(x => x.Endpoint).IsUnique();
+            e.HasIndex(x => x.UserId);
+            e.Property(x => x.Endpoint).HasMaxLength(1000);
+            e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 
         b.Entity<QrToken>(e =>

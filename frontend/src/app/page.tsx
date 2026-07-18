@@ -5,14 +5,8 @@ import { useEffect, useState } from "react";
 import { getSession, Session } from "@/lib/auth";
 import { LogoMark } from "@/components/ui/Logo";
 import { Button } from "@/components/ui";
-import {
-  IconQr,
-  IconCalendar,
-  IconSpark,
-  IconPin,
-  IconPhone,
-  IconChevron,
-} from "@/components/ui/Icons";
+import { IconQr, IconCalendar, IconSpark, IconChevron } from "@/components/ui/Icons";
+import { SiteFooter } from "@/components/SiteFooter";
 
 export default function Home() {
   const [session, setSession] = useState<Session | null>(null);
@@ -56,6 +50,11 @@ export default function Home() {
                       Ver horarios 2026
                     </Button>
                   </Link>
+                  <Link href="/novedades">
+                    <Button variant="ghost" icon={<IconSpark />}>
+                      Novedades
+                    </Button>
+                  </Link>
                 </>
               ) : (
                 <>
@@ -86,21 +85,13 @@ export default function Home() {
               <QuickCard href="/me" icon={<IconSpark />} title="Mi panel" desc="Tus cuponeras, historial de clases, pagos y saldo." />
             )}
             <QuickCard href="/horarios" icon={<IconCalendar />} title="Horarios 2026" desc="Grilla completa de clases de la semana." />
+            <QuickCard href="/novedades" icon={<IconSpark />} title="Novedades" desc="Noticias, muestras, talleres y eventos de la academia." />
           </div>
         </section>
       )}
 
-      {/* Pie con datos de la academia */}
-      <footer className="border-t border-ink-500/50 bg-ink-900/60">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-8 gap-y-2 px-5 py-6 text-sm text-muted-soft">
-          <span className="inline-flex items-center gap-2">
-            <IconPin /> Pablo de María 1474 esq. Brandzen
-          </span>
-          <span className="inline-flex items-center gap-2">
-            <IconPhone /> 092 136 401
-          </span>
-        </div>
-      </footer>
+      {/* Pie con datos de la academia (dirección con mapa, teléfono y redes) */}
+      <SiteFooter />
     </main>
   );
 }

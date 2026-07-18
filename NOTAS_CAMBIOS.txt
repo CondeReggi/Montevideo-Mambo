@@ -111,6 +111,23 @@
       .aab firmado. Camino mucho más liviano que la app nativa (reusa el mismo front).
       Workaround inmediato para el usuario: actualizar Chrome/Play Services/WebView y
       reinstalar; o usarla desde el navegador sin instalar. (nota 2026-07-04)
+  [!] ⚠️ ADVERTENCIA — HOY LA APP ES UNA PWA. Mantenerlo así. Todo lo que se
+      construye (contenidos, Mercado Pago, próximamente push) asume PWA: un solo
+      código Next servido desde Vercel, service worker propio (public/sw.js),
+      manifest.json instalable. Si en algún momento hay que TOCAR algo que obligue
+      a dejar de ser PWA y pasar a otra cosa (app NATIVA React Native/Expo, o
+      empaquetado TWA/Capacitor/WebView para tienda), eso NO es un ajuste sobre
+      lo actual: es un FEATURE APARTE, con su propio proyecto/pipeline/firma y su
+      propia decisión de negocio. NO convertir la PWA "sobre la marcha" dentro de
+      una tarea que iba de otra cosa. Antes de cualquier cambio que rompa el
+      supuesto PWA → parar, avisar y abrir el feature nuevo. (pedido 2026-07-18)
+      Casos que disparan esta advertencia (ejemplos, no exhaustivo):
+        - Notificaciones push en iOS que exijan app nativa en vez de Web Push.
+        - APIs de dispositivo no disponibles en navegador (NFC nativo, biometría,
+          background tasks reales, etc.).
+        - Requisito de publicar en App Store de Apple (la PWA sola no entra;
+          necesita empaquetado tipo TWA/Capacitor o app nativa).
+        - Cualquier pedido de "hacela app de verdad / subila a la tienda".
   [x] CRUD de PROFESORES desde la UI — página /admin/teachers (alta, edición
       por modal, baja/alta) + endpoints PUT/active + nav y dashboard. (2026-07-03) [E26]
   [ ] Cancelar / anular cuponeras (hoy sólo se EXTIENDE; falta anular con su
@@ -1169,3 +1186,503 @@ FIX [F6] enum.ToString() en Selects traducidos a SQL: en Postgres devolvía la
       12 tests de dominio OK; sin errores en log. Misma forma de respuesta para el front.
       NOTA dev: hay que reiniciar mambo_dev.db si el seed quedo fechado otro dia (la sesion
       demo se crea para "hoy").
+
+--------------------------------------------------------------------------
+2026-07-17 — ETAPA 1: validaciones criticas de QR/asistencia/cuponeras
+             + primeros tests de la capa Application
+--------------------------------------------------------------------------
+CONTEXTO: se pidio revisar y endurecer QR, cuponeras y pagos (ademas de un
+      backlog nuevo: Mercado Pago, contenidos, redes, push, mapa, responsive
+      y tiendas). Al auditar aparecieron bugs REALES de dinero, no solo huecos
+      de validacion. Se arreglaron escribiendo primero un test que los reproduce.
+
+[E52] NUEVO PROYECTO tests/Mambo.Application.Tests (37 tests):
+      Cierra el pendiente de CALIDAD del checklist ("tests de los servicios
+      nuevos"). Hasta ahora los 12 tests cubrian SOLO las 2 clases puras del
+      dominio; CheckInService, AttendanceConfirmationService y BillingService
+      -- que concentran toda la logica de estado, transacciones y ledger --
+      tenian cobertura CERO. Justo ahi vivian los bugs.
+      - Harness con SQLite EN MEMORIA sobre el MamboDbContext real (no el
+        provider InMemory de EF): respeta las constraints UNIQUE, que es lo
+        que varios tests necesitan verificar.
+      - El saldo SIEMPRE se afirma contra el LEDGER (fuente de verdad, D4),
+        nunca contra el cache pass.Balance.
+      - Se agrego InternalsVisibleTo para testear la recuperacion ante la
+        carrera de check-in.
+      Total: 12 (dominio) + 37 (application) = 49 tests en verde.
+
+[F7] BUG CRITICO — CorrectAsync REGALABA CLASES (fabrica de creditos):
+      AttendanceConfirmationService.CorrectAsync no tenia guarda de estado y
+      NUNCA limpiaba att.PassId. Cada POST /api/attendance/{id}/correct
+      acreditaba otro +1 al ledger, SIN LIMITE, y lo podia hacer cualquier
+      profesor. Reproducido: confirmar (-1) + corregir x3 (+3) => saldo +2
+      (el alumno terminaba con 2 clases regaladas).
+      FIX: (a) solo se corrige lo CONFIRMADO (lo unico que pudo consumir);
+           (b) al corregir se limpia PassId/CoveredByUnlimited (la historia
+               del consumo y su reverso queda en el ledger, inmutable, no en
+               la fila de asistencia).
+      Test: Corregir_DOS_VECES_no_regala_clases.
+
+[F8] DOBLE CONFIRMACION CONCURRENTE descontaba DOS clases:
+      La guarda "if (att.Status == Confirmed) return" es un read-check-write
+      sin lock: dos requests simultaneas (doble clic) la pasaban las dos y
+      ambas insertaban un consumo -1. Verificado: sin el fix el test da -2.
+      FIX: RECLAMO ATOMICO con ExecuteUpdateAsync (UPDATE condicional
+      "WHERE id=@id AND status <> confirmed"): solo una request logra la
+      transicion; la que pierde responde idempotente sin volver a descontar.
+      Se eligio esto en vez de un indice unico (attendance_id, reason) en el
+      ledger porque ese indice ROMPERIA un caso legitimo: confirmar ->
+      corregir -> reabrir -> volver a confirmar (segundo consumo valido de la
+      misma asistencia). Ventaja adicional: NO requiere cambio de esquema,
+      asi que no hay migracion ni hay que recrear mambo_dev.db.
+      Requirio sumar Microsoft.EntityFrameworkCore.Relational a Application
+      (ExecuteUpdateAsync es de Relational; sigue siendo agnostico del
+      proveedor: funciona igual en Postgres y en SQLite).
+      Test: Dos_confirmaciones_CONCURRENTES_descuentan_UNA_sola_clase.
+
+[F9] REAPERTURA tras rechazo arrastraba estado sucio (alimentaba F7):
+      El camino de reapertura (fix F5) seteaba Status/Source/CheckedInAt pero
+      NO limpiaba PassId, ConfirmedAt, ConfirmedBy ni CorrectionReason. La
+      fila quedaba con el ConfirmedBy de una confirmacion que ya no existia
+      (auditoria mentirosa) y con un PassId obsoleto que habilitaba F7.
+      FIX: helper Reopen(...) unico para Modo A y Modo B que limpia TODO el
+      rastro de la confirmacion anterior.
+      Test: Reabrir_tras_rechazo_limpia_el_rastro_de_la_confirmacion_anterior.
+
+[F10] CARRERA de check-in devolvia HTTP 500:
+      Dos check-ins simultaneos leen "no existe" y ambos insertan; el unique
+      uq_attendance_student_session corta al segundo con DbUpdateException,
+      que NADIE atrapaba -> el alumno veia un error del servidor por tocar
+      "escanear" dos veces rapido. La integridad nunca estuvo en riesgo (el
+      unique hacia su trabajo); el fallo era de manejo de error.
+      FIX: TryInsertAsync atrapa la violacion, relee la fila ganadora y
+      responde idempotente ("ya estaba registrada"). Si no hay fila ganadora
+      el error NO se silencia (era otra cosa).
+
+[E53] VALIDACIONES QUE FALTABAN:
+      - RegisterAsync (lo usa la asistencia manual del admin) ahora valida
+        alumno EXISTENTE y ACTIVO. Antes un admin podia registrar asistencia
+        de un alumno dado de baja, y un StudentId inexistente reventaba por
+        FK -> HTTP 500 en vez de un 400 con mensaje claro.
+      - AssignPassAsync valida alumno ACTIVO (antes solo existencia).
+      - RejectAsync: no se puede rechazar una CORREGIDA; re-rechazar es
+        idempotente y CONSERVA el motivo original (antes lo pisaba y se
+        perdia la historia).
+      - Confirm idempotente ya no miente en la cobertura: una asistencia
+        confirmada como debt_uncovered reportaba "pass" y GeneratedDebt=false.
+
+[D18] DECISION DE NEGOCIO — UNA CUPONERA ACTIVA POR TIPO (confirmada con el
+      usuario): AssignPassAsync rechaza entregar una cuponera si el alumno ya
+      tiene una ACTIVA y VIGENTE del MISMO tipo. Otros tipos se pueden
+      acumular (el consumo es FIFO por vencimiento) y una vencida no bloquea
+      la renovacion. Motivo: evitar la doble compra por error y, de cara a
+      Mercado Pago, que un reintento del alumno o un webhook repetido le
+      cobren dos veces lo mismo. Antes NO habia ninguna validacion (ni en la
+      app ni en la BD: la tabla pass no tiene ningun indice unico).
+
+[D19] DECISION — MERCADO PAGO REEMPLAZA A [D7] ("pagos 100% manuales, sin
+      pasarela"). El usuario pidio explicitamente compra de cuponeras con
+      Mercado Pago, asi que D7 queda SUPERADA. Modelo elegido: CHECKOUT PRO
+      (redirect): MP maneja tarjetas/PCI y nosotros solo creamos la
+      preferencia y procesamos el webhook. Se descarto Bricks (embebido)
+      porque exige abrir la CSP estricta (SEC-21) para cargar su SDK.
+      Regla dura: el precio SIEMPRE sale del catalogo en el backend; jamas se
+      acepta un importe del cliente. (Ver el matiz de RegisterPaymentAsync en
+      PENDIENTES.)
+
+[D20] DECISION — TIENDAS: se va por TWA en Google Play (envolver la PWA con
+      Bubblewrap/PWABuilder, ~US$25 pago unico), NO por app nativa Expo. iOS
+      queda como PWA instalable. En consecuencia, PUSH se implementa como WEB
+      PUSH (VAPID) en sw.js, no FCM/APNs. Esto reemplaza la recomendacion de
+      PLAN_MOBILE.txt (React Native + Expo, 6-10 semanas), que queda como
+      camino alternativo documentado si mas adelante se quiere App Store.
+
+VERIFICACION: 49/49 tests en verde. Los fixes F7 y F8 se validaron ROMPIENDO
+      el fix a proposito y viendo fallar el test (F8 sin el reclamo atomico:
+      saldo -2 en vez de -1), para no dejar tests decorativos.
+
+PENDIENTE / A DECIDIR (no se toco por ser cambio de conducta de negocio):
+  [ ] AttendanceConfirmationService: la condicion que marca Exhausted es
+      redundante (se reduce a Balance == 0). Cambiarla a "<= 0" marcaria
+      Exhausted a las cuponeras con saldo NEGATIVO, lo que dejaria
+      inalcanzable el caso debt_on_pass (toda la sobre-deuda pasaria a
+      debt_uncovered). Ambas variantes cuentan como deuda, pero cambian donde
+      se registra. Se dejo la conducta ACTUAL intacta. Requiere decision.
+  [ ] TRES VENTANAS HORARIAS DIVERGENTES: Modo A usa [fin-15, fin+30]
+      (AttendanceWindow), Modo B usa [inicio, fin+30] (IsSessionScannable) y
+      MeController.ActiveClasses reimplementa una tercera inline. El mismo
+      alumno, misma clase y mismo instante da resultado distinto segun el
+      modo (al minuto 0 el Modo B deja marcar y el Modo A lo manda a
+      pendiente por fuera de ventana). Queda DOCUMENTADO en un test
+      (Las_ventanas_de_Modo_A_y_Modo_B_son_distintas_a_proposito) para que la
+      divergencia sea explicita y no una sorpresa. Requiere decision de
+      negocio antes de unificar.
+  [ ] RegisterPaymentAsync (POST /api/admin/payments) acepta un importe
+      LIBRE del cliente y solo valida Amount > 0, sin contrastarlo con
+      PassType.Price aunque venga PassId. Se dejo asi A PROPOSITO: es
+      admin-only y los pagos parciales / senias son legitimos. La regla "no
+      permitir pagar menos" aplica al camino Mercado Pago, que NO debe reusar
+      este endpoint.
+  [ ] Deuda sin tope: un pack vigente puede acumular saldo negativo sin
+      limite ni alerta dura (es coherente con R5 "nunca impedir asistir",
+      pero convendria un umbral de aviso).
+
+--------------------------------------------------------------------------
+2026-07-17 — ETAPA 2: Mercado Pago (Checkout Pro) detras de un flag
+--------------------------------------------------------------------------
+CONTEXTO: se pidio compra de cuponeras con Mercado Pago (ver [D19]). El usuario
+      TODAVIA NO tiene credenciales, asi que se dejo la integracion COMPLETA pero
+      detras de un flag: si faltan las credenciales, la app funciona igual y la UI
+      muestra "proximamente"; alcanza con cargar el AccessToken para activarla.
+
+[E54] BACKEND — compra por pasarela (Checkout Pro, redirect):
+      - Nueva entidad PaymentIntent (payment_intent): NUESTRO registro del intento.
+        El importe es un SNAPSHOT del catalogo congelado al iniciar el checkout;
+        jamas se acepta un monto del cliente. Campos clave: amount, status
+        (PaymentIntentStatus pending/approved/rejected/cancelled), preference_id,
+        external_payment_id (UNIQUE, ancla de idempotencia), pass_id, payment_id,
+        failure_reason.
+      - IPaymentGateway (abstraccion en Application) + MercadoPagoGateway
+        (Infrastructure). El gateway tiene IsConfigured: si faltan credenciales
+        devuelve false y NADA se rompe.
+      - CheckoutService (Application) concentra la logica sensible:
+          * StartAsync: valida alumno activo + no-duplicado, congela el precio del
+            catalogo, crea la preferencia en MP y devuelve el init_point.
+          * HandleGatewayNotificationAsync: procesa el webhook. El webhook SOLO trae
+            el id del pago; el estado y el IMPORTE se consultan contra la API de MP
+            (el cuerpo del webhook no es confiable). Si el pago aprobado vino por
+            MENOS que el precio congelado -> se RECHAZA (no se entrega). Idempotente.
+          * Reclamo ATOMICO (ExecuteUpdateAsync WHERE status=pending) para que dos
+            webhooks simultaneos no entreguen dos cuponeras.
+          * Reusa BillingService.AssignPassCoreAsync (nuevo, sin tx propia) para
+            entregar la cuponera y marcar el intento en la MISMA transaccion.
+      - Endpoints:
+          GET  /api/checkout/availability   (anonimo) -> { enabled }  el front decide
+                                            entre "comprar" y "proximamente".
+          GET  /api/me/passtypes            catalogo comprable (precio del backend).
+          POST /api/me/checkout             inicia la compra (solo passTypeId).
+          GET  /api/me/checkout             mis compras + estado.
+          POST /api/webhooks/mercadopago    (anonimo) webhook. SIEMPRE responde 200
+                                            (un 4xx/5xx haria a MP reintentar en loop).
+      - Migracion db/migrations/008_payment_intent.sql (enum + tabla + indice UNIQUE
+        de idempotencia + trigger updated_at + RLS sin politicas). El SQL de db/
+        sigue siendo la fuente de verdad del esquema; en SQLite lo crea EnsureCreated.
+        IMPORTANTE (dev): EnsureCreated NO agrega tablas a una BD existente -> para
+        ver payment_intent en local hay que borrar mambo_dev.db y re-sembrar.
+      - Config (appsettings.json, por variable de entorno en prod, NUNCA en el repo):
+          MercadoPago__AccessToken   (obligatorio para habilitar)
+          MercadoPago__BackUrl       (a donde vuelve el alumno)
+          MercadoPago__NotificationUrl (URL publica del webhook)
+          MercadoPago__ApiBase       (override solo para sandbox/tests)
+
+[E55] FRONTEND — compra del alumno + cartel segun estado real:
+      - components/BuyPass.tsx: card "Comprar cuponera" en /me. Si el backend
+        responde enabled:false -> cartel celeste "Proximamente: Mercado Pago". Si
+        esta activo -> lista de cuponeras con su precio y boton Comprar (redirige a
+        MP con el init_point) + "Mis compras" con su estado. Al volver de MP con
+        ?compra=ok|pendiente|error muestra un toast y refresca (la cuponera la
+        entrega el webhook, puede tardar unos segundos).
+      - /admin/payments: el cartel fijo de "proximamente" ahora refleja el estado
+        REAL (getCheckoutAvailability): "Mercado Pago activo" o "falta cargar la
+        credencial".
+      - api.ts: getCheckoutAvailability, listMyPassTypes, listMyCheckouts,
+        startCheckout + tipo CheckoutIntent. El alumno solo manda passTypeId.
+
+[E56] TESTS — CheckoutService (12 tests nuevos, total 65 en verde):
+      Cubren lo critico con una pasarela de mentira (FakeGateway):
+      - El precio lo pone el BACKEND (a MP va el del catalogo, no el del cliente).
+      - Iniciar checkout NO entrega la cuponera todavia.
+      - Pago APROBADO entrega la cuponera (credito por ledger) y registra el pago.
+      - WEBHOOK REPETIDO x3 no entrega dos cuponeras (idempotencia).
+      - NO se puede pagar de MENOS que el precio real -> se rechaza.
+      - Si el catalogo sube DESPUES, el intento respeta su snapshot.
+      - Estados rejected/cancelled/pending; un rechazado no se aprueba despues.
+      - Webhooks de pagos ajenos o de intentos inexistentes se ignoran.
+      - Sin credenciales: StartAsync tira y el webhook no hace nada.
+
+VERIFICACION E2E (backend real + mock de la API de MP, no solo unit tests):
+      Se hizo la URL base del gateway configurable (MercadoPago__ApiBase) para
+      apuntar a un mock local y ejercitar el MercadoPagoGateway REAL (serializacion
+      JSON incluida, que el FakeGateway no cubre). 5 casos, todos OK:
+      1. Compra aprobada acredita +8 (Pack 8): 7 -> 15 clases.
+      2. Webhook repetido x3: sigue en 15 (NO 39). En BD: UN solo pago mercadopago
+         de $2200 pese a 4 webhooks.
+      3. Pago aprobado por $100 (< $1200): Leo NO recibe cuponera; intento Rejected
+         con motivo "Importe insuficiente".
+      4. Pago rejected en MP: no entrega nada.
+      5. Compra duplicada del mismo tipo vigente: rechazada.
+      Ademas: sin credenciales, GET /api/checkout/availability -> {enabled:false} y
+      POST /api/me/checkout -> 503 (la app no se rompe).
+
+NOTA para cuando lleguen las credenciales reales:
+      - Cargar MercadoPago__AccessToken (y BackUrl/NotificationUrl con las URLs
+        publicas de Vercel/Render) como env vars en Render. Con eso el flag se
+        prende solo.
+      - Configurar el webhook en el panel de MP apuntando a
+        https://<backend>/api/webhooks/mercadopago (topic: payment).
+      - Probar primero con credenciales de PRUEBA (sandbox) de MP.
+      - Moneda fijada en UYU en la preferencia.
+
+
+==========================================================================
+2026-07-18 — ETAPA 3: GESTIÓN DE CONTENIDOS (novedades/talleres/eventos)
+==========================================================================
+Objetivo del pedido: que el admin pueda crear/editar/borrar y publicar/ocultar
+noticias, novedades, muestras, talleres y eventos (título, descripción, imagen
+opcional, fecha, tipo, estado visible/oculto, link externo opcional, ubicación
+opcional) y que se vean claramente en la vista del alumno y en una página
+pública. La validación sensible (qué es visible) vive SIEMPRE en el backend:
+el endpoint público/alumno devuelve SOLO lo publicado; los borradores nunca
+salen del admin.
+
+[E57] BACKEND — entidad Content + ContentService + endpoints:
+      - Domain/Entities/Content.cs: Id, Type (enum ContentType: News/Update/
+        Showcase/Workshop/Event), Title, Body, ImagePath, EventDate (DateOnly?),
+        ExternalUrl, LocationName, LocationAddress, Latitude/Longitude (double?),
+        IsPublished, CreatedAt/UpdatedAt.
+      - Domain/Enums.cs: nuevo ContentType (además de PaymentIntentStatus de E52).
+      - Application/UseCases/ContentService.cs:
+          ListForAdminAsync   -> incluye borradores (admin).
+          ListPublishedAsync  -> SOLO publicados; filtro opcional por tipo.
+          CreateAsync / UpdateAsync / SetPublishedAsync / DeleteAsync.
+          UpdateAsync: ImagePath null = "no tocar la imagen actual" (para editar
+          sin re-subir el flyer). Auditoría (audit_log) en crear/editar/publicar/
+          ocultar/borrar.
+          MapAsync: si ImagePath ya es una URL http(s) (flyer hosteado afuera) se
+          usa tal cual; si es una ruta de Supabase Storage se firma (signed URL,
+          300s). Así la "imagen opcional" funciona hoy sin depender de la subida a
+          Storage (que sigue pendiente aparte).
+      - Api/Controllers/AdminContentController.cs [Authorize Policy=Admin],
+        ruta api/admin/content: GET (lista con borradores), POST (crear),
+        PUT/{id} (editar), POST/{id}/published (publicar/ocultar), DELETE/{id}.
+      - Api/Controllers/PublicController.cs: GET /api/public/content?type=
+        (anónimo) -> ListPublishedAsync. El alumno lo consume igual (contenido
+        de difusión, no sensible).
+      - MamboDbContext + IMamboDbContext: DbSet<Content>; mapeo con
+        Type como texto (HasConversion<string>().HasMaxLength(20)) para evitar el
+        problema de snake_case de los enums y que el mismo modelo sirva en SQLite
+        y Postgres. En Npgsql se agrega el enum nativo.
+      - Migración db/migrations/009_content.sql: tabla content (type como text) +
+        idx_content_published_type + trigger updated_at + RLS. El SQL de db/ sigue
+        siendo la fuente de verdad; en SQLite la crea EnsureCreated.
+        IMPORTANTE (dev): EnsureCreated NO agrega tablas a una BD existente -> para
+        ver la tabla content en local hay que borrar mambo_dev.db y re-sembrar.
+
+[E58] FRONTEND — admin + vista del alumno + página pública:
+      - components/ContentFeed.tsx: muro de contenidos publicados (solo lectura),
+        reutilizable. Card con imagen, badge de tipo, fecha, descripción,
+        ubicación (IconPin), botón "Cómo llegar" (abre Google Maps) y "Más info"
+        (link externo). Modo compact (primeras 3) para /me.
+      - app/novedades/page.tsx: página PÚBLICA (sin login) con el feed completo.
+      - app/admin/content/page.tsx: ABM con formulario inline (tipo, título,
+        descripción, fecha, imagen URL/ruta, link externo, lugar/dirección/lat/lng,
+        checkbox publicado) + acciones Editar / Ocultar-Publicar / Borrar
+        (confirmación de borrado con el diálogo de marca).
+      - app/me/page.tsx: sección "Novedades" con ContentFeed compact + la card de
+        compra de cuponera (BuyPass) de la Etapa 2.
+      - app/page.tsx (home): botón "Novedades" (sin sesión) y QuickCard (con
+        sesión) hacia /novedades.
+      - ui/TopBar.tsx: nuevo item de nav "Contenidos" (solo admin) -> /admin/content.
+      - components/format.tsx: CONTENT_TYPE_ES + contentTypeLabel + helper mapUrl
+        (prioriza lat/lng; si no, la dirección; devuelve URL de búsqueda de Google
+        Maps). Este helper es también la base de la Tarea 9 (mapa/ubicación).
+      - lib/api.ts: tipos Content/ContentInput/ContentType + listPublishedContent,
+        listAdminContent, createContent, updateContent, setContentPublished,
+        deleteContent.
+
+VERIFICACIÓN E2E (backend real + SQLite, no solo tipos):
+      Se creó un taller PUBLICADO con ubicación (Pablo de María 1474, lat -34.906,
+      lng -56.164) y una noticia BORRADOR (isPublished:false). Resultado:
+      1. El admin ve los 2 (incluye el borrador).
+      2. El público/alumno ve solo 1 (el publicado), con sus datos de ubicación.
+      3. Filtro por tipo Workshop -> 1; por tipo Event -> [] (vacío).
+      4. Ocultar el taller (POST /published {published:false} -> 204): el público
+         pasa a ver [], el admin lo sigue viendo. Publicar de nuevo lo restaura.
+      Los 75 tests siguen en verde (12 dominio + 63 Application).
+
+NOTA — cobertura parcial de la Tarea 9 (mapa/ubicación): los contenidos ya
+      guardan lugar/dirección/lat/lng y ofrecen "Cómo llegar" a Google Maps.
+      Falta (Tarea 9) mostrar la dirección de la academia con link a mapas en
+      más lugares de forma centralizada.
+
+
+==========================================================================
+2026-07-18 — REDES SOCIALES + UBICACIÓN CENTRALIZADA + RESPONSIVE ESCRITORIO
+==========================================================================
+Tres pedidos del backlog resueltos juntos porque comparten la misma base
+(datos de marca centralizados). Todo frontend, sin cambios de backend.
+
+[E59] REDES SOCIALES centralizadas (Tarea 3):
+      - Nuevo lib/site.ts: ÚNICO lugar con los datos de marca (nombre, slogan,
+        dirección, teléfono, URL de mapa) y las redes (WhatsApp, Instagram,
+        TikTok, Facebook, sitio web).
+      - Criterio (igual que Mercado Pago): cada red se muestra SOLO si tiene URL
+        cargada. WhatsApp sale solo (derivado del teléfono real 092 136 401 ->
+        wa.me/59892136401). Las demás quedan vacías por defecto y se cargan por
+        variable de entorno cuando el cliente pase sus enlaces reales:
+          NEXT_PUBLIC_INSTAGRAM_URL, NEXT_PUBLIC_TIKTOK_URL,
+          NEXT_PUBLIC_FACEBOOK_URL, NEXT_PUBLIC_WEBSITE_URL,
+          NEXT_PUBLIC_WHATSAPP_URL (override opcional), NEXT_PUBLIC_MAPS_URL.
+        No se inventan cuentas: sin URL, no se muestra el icono.
+      - Iconos nuevos en ui/Icons.tsx: IconInstagram, IconWhatsapp, IconFacebook,
+        IconTiktok, IconGlobe (glifos de marca; rellenos donde ayuda a reconocerlos).
+      - components/SiteFooter.tsx: <SocialLinks/> (fila de iconos, solo las
+        configuradas) + <SiteFooter/> (pie con dirección enlazada a mapa, teléfono
+        y redes). Reutilizable.
+      - Se muestran en: home (/), /novedades, grilla /horarios y /horarios/[dia],
+        y en el drawer móvil del TopBar (usuarios logueados).
+
+[E60] UBICACIÓN / MAPA (Tarea 9 — completada):
+      - SITE.mapsUrl: link a Google Maps con la dirección de la academia
+        (Pablo de María 1474 esq. Brandzen). La dirección pasó de texto plano a
+        ENLACE en todos los pies de página. Google Maps universal funciona tanto
+        en Android (abre Google Maps) como en iOS (abre Maps/navegador).
+      - Se elimina la duplicación: antes la dirección/teléfono estaban hardcodeados
+        en 4 páginas; ahora salen de SITE.
+      - Complementa lo ya hecho en la Etapa 3: los contenidos (talleres/eventos/
+        muestras) ya tenían lugar + lat/lng + botón "Cómo llegar" (helper mapUrl
+        en format.tsx, que prioriza lat/lng y cae a la dirección).
+
+[E61] RESPONSIVE ESCRITORIO / TABLET (Tarea 4):
+      - El navbar se veía "estirado tipo móvil" en pantallas grandes (alto fijo
+        h-16 y todo en text-sm). Ahora escala a partir de lg:
+          header: h-16 -> lg:h-20, contenedor max-w-6xl -> xl:max-w-7xl,
+                  padding lg:px-6, gaps mayores.
+          ítems de nav: lg:px-4 lg:py-2.5 lg:text-[15px], iconos lg:text-lg.
+          logo: prop `large` -> LogoMark lg:h-10 y wordmark MAMBO lg:text-2xl.
+          bloque de usuario y botones de acción (engranaje/salir): lg:h-10/lg:w-10
+                  y texto lg:text-[15px].
+          contenedor de contenido (Shell): lg:px-6 lg:py-10 (más respiro).
+      - Móvil queda igual (drawer a pantalla completa como antes).
+
+Verificación: tsc --noEmit OK, next lint 0 warnings, next build OK (21 rutas).
+
+
+==========================================================================
+2026-07-18 — NOTIFICACIONES PUSH (Web Push / VAPID) — Tarea 8
+==========================================================================
+Decisión [D20]: Web Push (VAPID), NO app nativa. Encaja con la PWA (Android y
+iOS 16.4+ con la PWA instalada soportan Web Push) y respeta la advertencia de no
+salir de PWA (ver backlog PRODUCTO). Si en el futuro se necesita push en iOS que
+exija app nativa, eso sería un FEATURE APARTE, no un ajuste sobre esto.
+
+Igual que Mercado Pago: si NO hay claves VAPID configuradas, la función está
+apagada (IsConfigured=false) y la UI ni siquiera ofrece activarla. La app no se
+rompe. Cripto delegada a la librería WebPush (aes128gcm + firma VAPID); NO se
+hace cripto a mano.
+
+[E62] BACKEND — suscripciones + envío + disparadores:
+      - Domain/Entities/Push.cs: entidad PushSubscription (Id, UserId, Endpoint
+        ÚNICO, P256dh, Auth, UserAgent, CreatedAt, LastUsedAt, FailureCount).
+        Un dispositivo/navegador = una fila; re-suscribir ACTUALIZA (no duplica).
+      - Application/Abstractions/IPushSender.cs: PushDevice, PushMessage,
+        enum PushDeliveryResult { Ok, Gone, Error }, IPushSender (IsConfigured,
+        PublicKey, SendAsync). Application depende de la abstracción, no de la lib.
+      - Application/UseCases/PushService.cs:
+          SubscribeAsync (upsert por endpoint; valida datos completos),
+          UnsubscribeAsync, SendToUserAsync, SendToRoleAsync (ej. todos los
+          alumnos), SendToAllAsync. DispatchAsync es BEST-EFFORT: nunca lanza
+          (una notificación no debe romper la operación que la dispara) y limpia
+          sola las suscripciones vencidas (Gone=404/410) o con muchos fallos.
+      - Infrastructure/Services/WebPushSender.cs (IPushSender): usa la librería
+        WebPush 1.0.12 (+ Portable.BouncyCastle). Serializa el payload
+        { title, body, url, tag } y mapea 404/410 -> Gone. IsConfigured = hay
+        clave pública Y privada.
+      - Api/Controllers/PushController.cs:
+          GET  /api/push/vapid-public-key   (anónimo) -> { enabled, publicKey }.
+          POST /api/push/subscribe          (auth) registra ESTE dispositivo al
+                                            usuario del token. 503 si no configurado.
+          POST /api/push/unsubscribe        (auth) da de baja el dispositivo.
+          POST /api/push/test               (auth) notificación de prueba a uno mismo.
+          POST /api/admin/push/broadcast    (Admin) difusión: all | students | teachers.
+      - Disparadores REALES cableados (best-effort, fuera de transacción):
+          * Contenido publicado -> aviso a TODOS los alumnos (ContentService, al
+            crear publicado o al pasar de borrador a publicado; no re-avisa).
+          * Asistencia confirmada -> aviso a ESE alumno (AttendanceConfirmationService,
+            solo cuando realmente transiciona a Confirmed; no en confirmaciones repetidas).
+          * Pago confirmado -> aviso a ESE alumno (BillingService.ConfirmPaymentAsync).
+        PushService se inyecta como OPCIONAL (nullable) en los servicios
+        transaccionales para no obligar a los tests unitarios a pasarlo.
+      - IMamboDbContext + MamboDbContext: DbSet<PushSubscription>; mapeo con
+        índice ÚNICO en endpoint + índice por user_id + FK a app_user con cascade.
+      - DI: IPushSender -> WebPushSender (singleton), PushService (scoped).
+      - Migración db/migrations/010_push_subscription.sql (tabla + índice único
+        de endpoint + índice por user + RLS). En SQLite la crea EnsureCreated.
+        IMPORTANTE (dev): EnsureCreated NO agrega tablas a una BD existente -> para
+        ver push_subscription en local hay que borrar mambo_dev.db y re-sembrar.
+      - Config (appsettings.json; por variable de entorno en prod, NUNCA en el repo):
+          Push__VapidPublicKey   (base64url; también la usa el frontend)
+          Push__VapidPrivateKey  (base64url; SECRETO)
+          Push__Subject          (mailto:... o URL de contacto; requerido por el estándar)
+
+[E63] FRONTEND — service worker + suscripción + UI:
+      - public/sw.js: nuevos handlers 'push' (muestra la notificación con
+        title/body/icon/tag) y 'notificationclick' (enfoca o abre la app en la url).
+        El resto del SW (cache del app shell) sin cambios. La PWA sigue igual.
+      - lib/push.ts: pushSupported(), currentPushState(), enablePush()
+        (pide permiso + PushManager.subscribe con la clave pública VAPID + manda
+        endpoint/keys al backend), disablePush().
+      - components/PushSettings.tsx: en /settings, toggle de notificaciones por
+        dispositivo (activar / prueba / desactivar) para cualquier usuario, y para
+        ADMIN un formulario de difusión (todos / alumnos / profesores). Si el
+        backend no tiene claves, no se muestra nada (igual criterio que MP).
+      - lib/api.ts: getVapidKey, subscribePush, unsubscribePush, testPush, broadcastPush.
+      - ui/Icons.tsx: IconBell.
+
+TESTS (7 nuevos; total 82: 12 dominio + 70 Application):
+      PushServiceTests con un FakePushSender (no sale a la red):
+      - Suscribir dos veces el MISMO endpoint no duplica (y actualiza el user agent).
+      - Suscripción incompleta se rechaza.
+      - Enviar al usuario llega a TODOS sus dispositivos.
+      - Enviar por ROL llega solo a los alumnos (no a otros roles).
+      - Una suscripción vencida (Gone) se borra sola tras el envío.
+      - Sin configuración no envía nada.
+      - Desuscribir borra el dispositivo.
+
+VERIFICACIÓN E2E (backend real, SQLite):
+      - Sin claves: GET /api/push/vapid-public-key -> {enabled:false}; POST
+        /api/push/subscribe sin token -> 401 (la app arranca OK: la DI de los
+        servicios push nuevos no rompe el arranque).
+      - Con un par VAPID real (generado con la librería): GET vapid-public-key ->
+        {enabled:true, publicKey:...}. El flag se prende solo al cargar las claves.
+      NOTA: la ENTREGA real de la notificación solo se puede probar en un navegador
+      con HTTPS (y en iPhone con la PWA instalada, iOS 16.4+); no es verificable
+      headless porque hace falta una suscripción real del navegador.
+
+GENERAR EL PAR DE CLAVES VAPID (una sola vez):
+      Con la librería WebPush ya incluida:
+        var k = WebPush.VapidHelper.GenerateVapidKeys();
+        // k.PublicKey  -> Push__VapidPublicKey  (y NEXT_PUBLIC no hace falta: la
+        //                 pública la sirve el backend en /api/push/vapid-public-key)
+        // k.PrivateKey -> Push__VapidPrivateKey (SECRETO)
+      Cargarlas como variables de entorno en Render (backend). Con eso el flag se
+      prende solo. El Subject debe ser un mailto: o URL de contacto real.
+
+PENDIENTE (no bloqueante) para cerrar la Tarea 8 al 100%:
+      - Recordatorios de clase y avisos de DEUDA: hoy AlertsService ya calcula
+        "alumnos en riesgo" y "pendientes antiguas", pero no hay un JOB programado
+        que dispare el push. Falta un cron/hosted service que llame a un envío de
+        recordatorios (se puede reusar AlertsService + PushService.SendToUserAsync).
+        La CAPACIDAD de enviar ya está; falta el disparador temporal.
+      - Aviso de "compra aprobada" por Mercado Pago (CheckoutService): fácil de
+        sumar cuando MP esté activo (reusa PushService.SendToUserAsync).
+
+==========================================================================
+2026-07-18 — INFORME DE PUBLICACIÓN EN TIENDAS (Tarea 5, sin publicar)
+==========================================================================
+[E64] Nuevo docs/04-PUBLICACION-TIENDAS.md: relevamiento de qué falta para
+      publicar en Google Play y App Store (NO se publica nada). Resumen:
+      - La PWA ya es instalable en Android; el problema es solo el aviso de
+        "versión anterior de Android" en algunos equipos.
+      - Camino A recomendado: Google Play como TWA (Bubblewrap/PWABuilder),
+        US$25 pago único, reusa el front. Camino B (App Store) exige wrapper
+        nativo (Capacitor) o app nativa + Mac + US$99/año = FEATURE APARTE
+        (respeta la advertencia PWA del backlog).
+      - BLOQUEANTES legales para CUALQUIER tienda (hoy faltan): página de
+        política de privacidad + términos, y BORRADO DE CUENTA in-app (Google y
+        Apple lo exigen). Además faltan screenshots y textos de ficha, y el
+        assetlinks.json para la TWA.
+      - Riesgo de pagos: al ser clases PRESENCIALES (servicio real) y con MP por
+        REDIRECCIÓN (Checkout Pro), se permite cobrar por fuera de la tienda.
+      - Orden sugerido: 1) privacidad/términos 2) eliminar cuenta 3) assets de
+        ficha 4) TWA + Play Console 5) (futuro) iOS.

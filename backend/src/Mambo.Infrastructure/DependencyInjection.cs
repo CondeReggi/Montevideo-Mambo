@@ -44,6 +44,7 @@ public static class DependencyInjection
             dsBuilder.MapEnum<Domain.PassKind>("pass_kind");
             dsBuilder.MapEnum<Domain.PassStatus>("pass_status");
             dsBuilder.MapEnum<Domain.PaymentStatus>("payment_status");
+            dsBuilder.MapEnum<Domain.PaymentIntentStatus>("payment_intent_status");
             dsBuilder.MapEnum<Domain.LedgerReason>("ledger_reason");
             var dataSource = dsBuilder.Build();
 
@@ -71,8 +72,17 @@ public static class DependencyInjection
         services.AddScoped<AuthService>();
         services.AddScoped<AdminService>();
         services.AddScoped<BillingService>();
+        // Pasarela de pago. Si no hay credenciales, IsConfigured=false y la UI muestra
+        // "próximamente" en vez de ofrecer el pago (la app no se rompe).
+        services.AddScoped<IPaymentGateway, MercadoPagoGateway>();
+        services.AddScoped<CheckoutService>();
         services.AddScoped<StudentPanelService>();
         services.AddScoped<AlertsService>();
+        services.AddScoped<ContentService>();
+        // Notificaciones push (Web Push/VAPID). Si no hay claves, IsConfigured=false
+        // y la app no ofrece notificaciones (la app no se rompe).
+        services.AddSingleton<IPushSender, WebPushSender>();
+        services.AddScoped<PushService>();
         services.AddScoped<DevSeeder>();
 
         return services;

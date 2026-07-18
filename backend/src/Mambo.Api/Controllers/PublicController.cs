@@ -1,4 +1,5 @@
 using Mambo.Application.Abstractions;
+using Mambo.Application.UseCases;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -7,8 +8,13 @@ namespace Mambo.Api.Controllers;
 /// <summary>Endpoints públicos (sin autenticación) para páginas de difusión.</summary>
 [ApiController]
 [Route("api/public")]
-public class PublicController(IMamboDbContext db) : ControllerBase
+public class PublicController(IMamboDbContext db, ContentService content) : ControllerBase
 {
+    /// <summary>Contenidos publicados (noticias, novedades, muestras, talleres, eventos).</summary>
+    [HttpGet("content")]
+    public async Task<IActionResult> Content([FromQuery] string? type, CancellationToken ct) =>
+        Ok(await content.ListPublishedAsync(type, ct));
+
     /// <summary>Grilla de clases activas para la página pública de horarios.</summary>
     [HttpGet("schedule")]
     public async Task<IActionResult> Schedule(CancellationToken ct)

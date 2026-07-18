@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/useAuth";
 import {
   listStudents, listDebtors, registerPayment,
   listPendingPayments, confirmPayment, cancelPayment,
+  getCheckoutAvailability,
   StudentRow, Debtor, PendingPayment, ApiError,
 } from "@/lib/api";
 import { Shell, PageHeader } from "@/components/ui/TopBar";
@@ -24,6 +25,7 @@ export default function AdminPayments() {
   const [debtors, setDebtors] = useState<Debtor[] | null>(null);
   const [pending, setPending] = useState<PendingPayment[] | null>(null);
   const [busy, setBusy] = useState(false);
+  const [mpEnabled, setMpEnabled] = useState<boolean | null>(null);
   const [form, setForm] = useState({ studentId: "", amount: "", method: "efectivo", concept: "", confirmed: true });
 
   const loadDebtors = useCallback(async () => {
@@ -49,6 +51,9 @@ export default function AdminPayments() {
   useEffect(() => {
     if (ready) loadAll();
   }, [ready, loadAll]);
+  useEffect(() => {
+    getCheckoutAvailability().then((r) => setMpEnabled(r.enabled)).catch(() => setMpEnabled(false));
+  }, []);
   useRegisterRefresh(loadAll);
 
   const submit = async () => {
@@ -91,14 +96,27 @@ export default function AdminPayments() {
     <Shell>
       <PageHeader eyebrow="Administración" title="Pagos" subtitle="Registrá pagos manuales y controlá la morosidad." />
 
-      {/* Aviso: integración futura con Mercado Pago */}
+      {/* Estado de Mercado Pago: refleja si la pasarela está configurada en el backend */}
       <div className="mb-5 flex items-start gap-3 rounded-xl border border-sky-400/40 bg-sky-400/10 px-4 py-3 text-sm text-sky-200 animate-fade-up">
         <span className="mt-0.5 text-lg text-sky-300"><IconSpark /></span>
         <div>
-          <p className="font-semibold text-sky-100">Próximamente: Mercado Pago</p>
-          <p className="text-sky-200/80">
-            Vas a poder cobrar con link de pago / QR de Mercado Pago desde acá; por ahora los pagos se registran manualmente.
-          </p>
+          {mpEnabled === true ? (
+            <>
+              <p className="font-semibold text-sky-100">Mercado Pago activo</p>
+              <p className="text-sky-200/80">
+                Los alumnos pueden comprar cuponeras online; el pago acredita la cuponera solo.
+                Acá se registran los pagos en efectivo/transferencia.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="font-semibold text-sky-100">Próximamente: Mercado Pago</p>
+              <p className="text-sky-200/80">
+                La compra online ya está integrada; falta cargar la credencial de Mercado Pago en el
+                backend para activarla. Por ahora los pagos se registran manualmente.
+              </p>
+            </>
+          )}
         </div>
       </div>
 

@@ -301,6 +301,73 @@ export interface DisplaySession {
 export interface DisplayActive { rotateInSeconds: number; sessions: DisplaySession[]; }
 export const getDisplayActive = () => api<DisplayActive>("/api/display/active");
 
+// ---- Compra de cuponeras por Mercado Pago (alumno) ----
+// El alumno solo elige QUÉ comprar (passTypeId): el precio lo pone el backend desde el
+// catálogo. Nunca se manda un importe desde acá.
+export interface CheckoutIntent {
+  id: string; status: "Pending" | "Approved" | "Rejected" | "Cancelled";
+  amount: number; passTypeName: string; failureReason: string | null; createdAt: string;
+}
+
+export const getCheckoutAvailability = () => api<{ enabled: boolean }>("/api/checkout/availability");
+export const listMyPassTypes = () => api<PassType[]>("/api/me/passtypes");
+export const listMyCheckouts = () => api<CheckoutIntent[]>("/api/me/checkout");
+
+export const startCheckout = (passTypeId: string) =>
+  api<{ intentId: string; initPoint: string }>("/api/me/checkout", {
+    method: "POST", body: JSON.stringify({ passTypeId }),
+  });
+
+// ---- Contenidos (noticias, novedades, muestras, talleres, eventos) ----
+// Tipos válidos (coinciden con el enum del backend):
+export type ContentType = "News" | "Update" | "Showcase" | "Workshop" | "Event";
+
+export interface Content {
+  id: string;
+  type: ContentType;
+  title: string;
+  body: string | null;
+  imageUrl: string | null;
+  eventDate: string | null;
+  externalUrl: string | null;
+  locationName: string | null;
+  locationAddress: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  isPublished: boolean;
+  createdAt: string;
+}
+
+// Cuerpo de alta/edición. imagePath opcional (ruta en Storage; null = no cambiar).
+export interface ContentInput {
+  type: ContentType;
+  title: string;
+  body?: string | null;
+  imagePath?: string | null;
+  eventDate?: string | null;
+  externalUrl?: string | null;
+  locationName?: string | null;
+  locationAddress?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  isPublished: boolean;
+}
+
+// Público / alumno: solo lo publicado.
+export const listPublishedContent = (type?: ContentType) =>
+  api<Content[]>(`/api/public/content${type ? `?type=${type}` : ""}`);
+
+// Admin: CRUD completo (incluye borradores).
+export const listAdminContent = () => api<Content[]>("/api/admin/content");
+export const createContent = (body: ContentInput) =>
+  api<{ id: string }>("/api/admin/content", { method: "POST", body: JSON.stringify(body) });
+export const updateContent = (id: string, body: ContentInput) =>
+  api(`/api/admin/content/${id}`, { method: "PUT", body: JSON.stringify(body) });
+export const setContentPublished = (id: string, published: boolean) =>
+  api(`/api/admin/content/${id}/published`, { method: "POST", body: JSON.stringify({ published }) });
+export const deleteContent = (id: string) =>
+  api(`/api/admin/content/${id}`, { method: "DELETE" });
+
 // ---- Cuponeras y pagos (admin) ----
 export interface PassType {
   id: string; name: string; kind: string; classCount: number | null; price: number; validityDays: number;
@@ -338,3 +405,21 @@ export const cancelPayment = (id: string) => api(`/api/admin/payments/${id}/canc
 
 export const manualAttendance = (studentId: string) =>
   api<CheckInResult>("/api/admin/attendance/manual", { method: "POST", body: JSON.stringify({ studentId }) });
+
+// ---- Notificaciones push (Web Push) --------------------------------------
+export interface VapidInfo {
+  enabled: boolean;
+  publicKey: string | null;
+}
+export const getVapidKey = () => api<VapidInfo>("/api/push/vapid-public-key");
+
+export const subscribePush = (body: { endpoint: string; keys: { p256dh: string; auth: string } }) =>
+  api("/api/push/subscribe", { method: "POST", body: JSON.stringify(body) });
+
+export const unsubscribePush = (endpoint: string) =>
+  api("/api/push/unsubscribe", { method: "POST", body: JSON.stringify({ endpoint }) });
+
+export const testPush = () => api<{ sent: number }>("/api/push/test", { method: "POST" });
+
+export const broadcastPush = (body: { title: string; body: string; url?: string; target?: string }) =>
+  api<{ sent: number }>("/api/admin/push/broadcast", { method: "POST", body: JSON.stringify(body) });

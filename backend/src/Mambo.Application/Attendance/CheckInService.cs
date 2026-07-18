@@ -29,6 +29,26 @@ public class CheckInService(IMamboDbContext db, IClock clock)
         nowUtc >= startUtc && nowUtc <= endUtc + Mambo.Domain.Rules.AttendanceWindow.ClosesAfterEnd;
 
     /// <summary>
+    /// Reabre una asistencia Rechazada/Corregida como Pendiente (mismo registro: hay un unique
+    /// por alumno+sesión, no se puede insertar otra fila). Limpia TODO el rastro de la
+    /// confirmación anterior: si no, la fila arrastra ConfirmedBy/ConfirmedAt de una
+    /// confirmación que ya no existe (auditoría falsa) y un PassId obsoleto.
+    /// </summary>
+    private static void Reopen(Attendance existing, AttendanceSource source, DateTime now, bool ambiguous)
+    {
+        existing.Status = AttendanceStatus.Pending;
+        existing.Source = source;
+        existing.CheckedInAt = now;
+        existing.IsAmbiguous = ambiguous;
+        existing.PassId = null;
+        existing.CoveredByUnlimited = false;
+        existing.ConfirmedAt = null;
+        existing.ConfirmedBy = null;
+        existing.CorrectionReason = null;
+        existing.UpdatedAt = now;
+    }
+
+    /// <summary>
     /// Check-in sobre una sesión EXPLÍCITA (Modo B: el alumno escaneó el QR de esa clase).
     /// Valida que la sesión esté activa, evita duplicados y crea una asistencia Pendiente.
     /// </summary>
@@ -58,11 +78,7 @@ public class CheckInService(IMamboDbContext db, IClock clock)
                 return new CheckInResult(existing.Id, studentId, existing.Status, existing.IsAmbiguous,
                     false, true, "Ya habías marcado asistencia a esta clase.");
 
-            existing.Status = AttendanceStatus.Pending;
-            existing.Source = source;
-            existing.CheckedInAt = now;
-            existing.IsAmbiguous = false;
-            existing.UpdatedAt = now;
+            Reopen(existing, source, now, ambiguous: false);
             await db.SaveChangesAsync(ct);
             return new CheckInResult(existing.Id, studentId, existing.Status, false, false, false,
                 "Asistencia registrada como pendiente.");
@@ -81,9 +97,38 @@ public class CheckInService(IMamboDbContext db, IClock clock)
             UpdatedAt = now
         };
         db.Attendances.Add(attendance);
-        await db.SaveChangesAsync(ct);
+
+        if (await TryInsertAsync(attendance, ct) is { } raced)
+            return new CheckInResult(raced.Id, studentId, raced.Status, raced.IsAmbiguous, false, true,
+                "Ya habías marcado asistencia a esta clase.");
+
         return new CheckInResult(attendance.Id, studentId, attendance.Status, false, false, false,
             "Asistencia registrada como pendiente.");
+    }
+
+    /// <summary>
+    /// Inserta la asistencia y resuelve la CARRERA de dos check-ins simultáneos: ambos
+    /// leen "no existe" y ambos insertan; el unique (alumno, sesión) rechaza al segundo.
+    /// Devuelve la fila ganadora si hubo carrera, o null si el insert salió bien.
+    /// Sin esto, un doble toque rápido devolvía HTTP 500 en vez de la respuesta idempotente.
+    /// </summary>
+    internal async Task<Attendance?> TryInsertAsync(Attendance attendance, CancellationToken ct)
+    {
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            return null;
+        }
+        catch (DbUpdateException)
+        {
+            // El insert perdió la carrera: hay que soltarlo para poder releer la fila ganadora.
+            db.Attendances.Entry(attendance).State = EntityState.Detached;
+            var winner = await db.Attendances.AsNoTracking().FirstOrDefaultAsync(
+                a => a.StudentId == attendance.StudentId && a.ClassSessionId == attendance.ClassSessionId, ct);
+            // Si no hay fila ganadora, el fallo no fue el unique: es otro error y no se silencia.
+            if (winner is null) throw;
+            return winner;
+        }
     }
 
     /// <summary>Check-in por id de alumno.</summary>
@@ -91,6 +136,12 @@ public class CheckInService(IMamboDbContext db, IClock clock)
     {
         var now = clock.UtcNow;
         var today = clock.LocalToday();
+
+        // Se valida acá (y no solo en los wrappers): este método es público y lo llama
+        // directo la asistencia manual del admin. Sin esto, un alumno dado de baja podía
+        // registrar asistencia y un StudentId inexistente reventaba con FK -> HTTP 500.
+        if (!await db.Students.AnyAsync(s => s.Id == studentId && s.IsActive, ct))
+            throw new InvalidOperationException("Alumno no encontrado o inactivo.");
 
         // Sesiones de hoy no canceladas (la grilla del día).
         var sessions = await db.Sessions
@@ -137,11 +188,7 @@ public class CheckInService(IMamboDbContext db, IClock clock)
                 return new CheckInResult(existing.Id, studentId, existing.Status, existing.IsAmbiguous,
                     outOfWindow, true, "Ya existía un registro para esta clase.");
 
-            existing.Status = AttendanceStatus.Pending;
-            existing.Source = resolvedSource;
-            existing.CheckedInAt = now;
-            existing.IsAmbiguous = ambiguous;
-            existing.UpdatedAt = now;
+            Reopen(existing, resolvedSource, now, ambiguous);
             await db.SaveChangesAsync(ct);
             var reopenMsg = outOfWindow ? "Registrado fuera de ventana: pendiente de revisión."
                 : ambiguous ? "Registrado, pero la clase es ambigua: requiere revisión."
@@ -162,7 +209,10 @@ public class CheckInService(IMamboDbContext db, IClock clock)
             UpdatedAt = now
         };
         db.Attendances.Add(attendance);
-        await db.SaveChangesAsync(ct);
+
+        if (await TryInsertAsync(attendance, ct) is { } raced)
+            return new CheckInResult(raced.Id, studentId, raced.Status, raced.IsAmbiguous, outOfWindow, true,
+                "Ya existía un registro para esta clase.");
 
         var msg = outOfWindow ? "Registrado fuera de ventana: pendiente de revisión."
                 : ambiguous ? "Registrado, pero la clase es ambigua: requiere revisión."

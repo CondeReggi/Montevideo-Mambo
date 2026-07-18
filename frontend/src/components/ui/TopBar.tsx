@@ -10,6 +10,7 @@ import { IconLogout, IconQr, IconUsers, IconCalendar, IconCash, IconTicket, Icon
 import { getSession, Session } from "@/lib/auth";
 import { endSession } from "@/lib/api";
 import InstallBanner from "@/components/InstallBanner";
+import { SocialLinks } from "@/components/SiteFooter";
 
 interface NavItem {
   href: string;
@@ -27,6 +28,7 @@ const NAV: NavItem[] = [
   { href: "/admin/classes", label: "Clases", icon: <IconCalendar />, roles: ["admin"] },
   { href: "/admin/passes", label: "Cuponeras", icon: <IconTicket />, roles: ["admin"] },
   { href: "/admin/payments", label: "Pagos", icon: <IconCash />, roles: ["admin"] },
+  { href: "/admin/content", label: "Contenidos", icon: <IconSpark />, roles: ["admin"] },
   { href: "/me", label: "Mi panel", icon: <IconSpark />, roles: ["student"] },
 ];
 
@@ -74,7 +76,7 @@ export function TopBar() {
   return (
     <>
       <header className="sticky top-0 z-40 border-b border-ink-500/60 bg-ink-900/80 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4">
+      <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 lg:h-20 lg:gap-4 lg:px-6 xl:max-w-7xl">
         {/* Burger (solo móvil) */}
         {items.length > 0 && (
           <button
@@ -86,9 +88,9 @@ export function TopBar() {
           </button>
         )}
 
-        <Logo />
+        <Logo large />
 
-        <nav className="scrollbar-thin ml-4 hidden flex-1 items-center gap-1 overflow-x-auto md:flex">
+        <nav className="scrollbar-thin ml-4 hidden flex-1 items-center gap-1 overflow-x-auto md:flex lg:ml-6 lg:gap-1.5">
           {items.map((n) => {
             const active = isActive(n.href);
             return (
@@ -96,27 +98,27 @@ export function TopBar() {
                 key={n.href}
                 href={n.href}
                 ref={active ? desktopActiveRef : undefined}
-                className={`flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                className={`flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition lg:gap-2 lg:rounded-xl lg:px-4 lg:py-2.5 lg:text-[15px] ${
                   active
                     ? "bg-lime/15 text-lime"
                     : "text-muted-soft hover:bg-ink-700 hover:text-foreground"
                 }`}
               >
-                <span className="text-base">{n.icon}</span>
+                <span className="text-base lg:text-lg">{n.icon}</span>
                 {n.label}
               </Link>
             );
           })}
         </nav>
 
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-auto flex items-center gap-3 lg:gap-3.5">
           {session ? (
             <>
               <div className="hidden items-center gap-2.5 sm:flex">
                 <Avatar name={session.fullName} size="sm" />
                 <div className="leading-tight">
-                  <p className="text-sm font-semibold">{session.fullName}</p>
-                  <p className="text-[11px] uppercase tracking-wide text-muted">
+                  <p className="text-sm font-semibold lg:text-[15px]">{session.fullName}</p>
+                  <p className="text-[11px] uppercase tracking-wide text-muted lg:text-xs">
                     {session.roles.join(" · ")}
                   </p>
                 </div>
@@ -125,20 +127,20 @@ export function TopBar() {
               <Link
                 href="/settings"
                 title="Configuración"
-                className="hidden h-9 w-9 place-items-center rounded-lg border border-ink-500 text-muted transition hover:border-lime/40 hover:text-lime md:grid"
+                className="hidden h-9 w-9 place-items-center rounded-lg border border-ink-500 text-muted transition hover:border-lime/40 hover:text-lime md:grid lg:h-10 lg:w-10 lg:text-lg"
               >
                 <IconGear />
               </Link>
               <button
                 onClick={logout}
                 title="Cerrar sesión"
-                className="hidden h-9 w-9 place-items-center rounded-lg border border-ink-500 text-muted transition hover:border-red-500/40 hover:text-red-300 md:grid"
+                className="hidden h-9 w-9 place-items-center rounded-lg border border-ink-500 text-muted transition hover:border-red-500/40 hover:text-red-300 md:grid lg:h-10 lg:w-10 lg:text-lg"
               >
                 <IconLogout />
               </button>
             </>
           ) : (
-            <Link href="/login" className="btn-primary btn-sm">
+            <Link href="/login" className="btn-primary btn-sm lg:!h-10 lg:px-5 lg:text-[15px]">
               Ingresar
             </Link>
           )}
@@ -226,6 +228,7 @@ export function TopBar() {
                 </span>
                 Cerrar sesión
               </button>
+              <SocialLinks className="justify-center pt-2" />
             </div>
           </div>
           </div>,
@@ -246,7 +249,7 @@ export function Shell({
   return (
     <div className="min-h-screen">
       <TopBar />
-      <main className={`mx-auto w-full ${max} overflow-x-clip px-4 py-6 sm:py-8`}>
+      <main className={`mx-auto w-full ${max} overflow-x-clip px-4 py-6 sm:py-8 lg:px-6 lg:py-10`}>
         <InstallBanner />
         {children}
       </main>

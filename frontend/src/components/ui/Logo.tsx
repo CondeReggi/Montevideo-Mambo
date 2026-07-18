@@ -28,23 +28,31 @@ export function LogoMark({ className = "h-9 w-9" }: { className?: string }) {
   );
 }
 
-/** Logo completo con wordmark, para cabeceras. */
+/** Logo completo con wordmark, para cabeceras. `large` lo agranda en escritorio. */
 export function Logo({
   href = "/",
   compact = false,
+  large = false,
 }: {
   href?: string | null;
   compact?: boolean;
+  large?: boolean;
 }) {
   const inner = (
     <span className="inline-flex items-center gap-2.5">
-      <LogoMark className="h-8 w-8 shrink-0 drop-shadow-[0_0_12px_rgba(196,248,43,0.5)]" />
+      <LogoMark
+        className={`${large ? "h-8 w-8 lg:h-10 lg:w-10" : "h-8 w-8"} shrink-0 drop-shadow-[0_0_12px_rgba(196,248,43,0.5)]`}
+      />
       {!compact && (
         <span className="leading-none">
-          <span className="block font-display text-[11px] tracking-[0.28em] text-muted-soft">
+          <span
+            className={`block font-display tracking-[0.28em] text-muted-soft ${large ? "text-[11px] lg:text-xs" : "text-[11px]"}`}
+          >
             MONTEVIDEO
           </span>
-          <span className="block font-display text-lg leading-none tracking-[0.14em] text-lime text-glow">
+          <span
+            className={`block font-display leading-none tracking-[0.14em] text-lime text-glow ${large ? "text-lg lg:text-2xl" : "text-lg"}`}
+          >
             MAMBO
           </span>
         </span>

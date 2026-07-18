@@ -49,6 +49,30 @@ export function fmtDate(iso: string): string {
   }
 }
 
+// Etiquetas en español de los tipos de contenido de difusión.
+export const CONTENT_TYPE_ES: Record<string, string> = {
+  News: "Noticia",
+  Update: "Novedad",
+  Showcase: "Muestra",
+  Workshop: "Taller",
+  Event: "Evento",
+};
+export const contentTypeLabel = (t: string) => CONTENT_TYPE_ES[t] ?? t;
+
+/**
+ * URL para abrir una ubicación en el mapa. Prioriza coordenadas (más preciso); si no
+ * hay, usa la dirección de texto. El esquema geo:/maps genérico deja que el dispositivo
+ * elija Google Maps (Android) o Apple Maps (iOS). Devuelve null si no hay ubicación.
+ */
+export function mapUrl(loc: {
+  latitude?: number | null; longitude?: number | null; locationAddress?: string | null; locationName?: string | null;
+}): string | null {
+  if (loc.latitude != null && loc.longitude != null)
+    return `https://www.google.com/maps/search/?api=1&query=${loc.latitude},${loc.longitude}`;
+  const text = loc.locationAddress || loc.locationName;
+  return text ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(text)}` : null;
+}
+
 export function StatusBadge({ status }: { status: string }) {
   const tone =
     status === "Confirmed" || status === "Active"
