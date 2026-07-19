@@ -20,6 +20,7 @@ public class MeController(
     ICurrentUser me) : ControllerBase
 {
     public record ScanRequest(string Token);
+    public record ScanDemoRequest(Guid SessionId);
 
     /// <summary>Panel del alumno autenticado: saldo, cuponeras, historial y pagos.</summary>
     [HttpGet("panel")]
@@ -84,6 +85,48 @@ public class MeController(
             return BadRequest(new { error = ex.Message });
         }
     }
+
+    /// <summary>
+    /// Marca asistencia en una clase activa SIN escanear el QR. Es SOLO para usuarios
+    /// de DEMOSTRACIÓN (correo @mambo.local) del ambiente desplegado, que no están
+    /// físicamente en la academia ni tienen el QR. Simula el escaneo del Modo B.
+    /// El dominio se valida en el backend (no se confía en el cliente) y la sesión
+    /// debe estar realmente activa (misma ventana que active-classes).
+    /// </summary>
+    [HttpPost("scan-demo")]
+    public async Task<IActionResult> ScanDemo([FromBody] ScanDemoRequest req, CancellationToken ct)
+    {
+        var userId = me.UserIdOrThrow();
+        var email = await db.Users.Where(u => u.Id == userId).Select(u => u.Email).FirstOrDefaultAsync(ct);
+        if (!IsDemoUser(email))
+            return StatusCode(StatusCodes.Status403Forbidden,
+                new { error = "El marcado simulado solo está disponible para usuarios de demostración." });
+
+        var studentId = await MyStudentIdAsync(ct);
+        if (studentId is null) return NotFound(new { error = "El usuario no es un alumno." });
+
+        // La sesión debe estar activa AHORA (misma ventana que active-classes): no se
+        // permite marcar en una sesión arbitraria, solo en una clase que esté corriendo.
+        var now = clock.UtcNow;
+        var floor = now.AddMinutes(-(int)Mambo.Domain.Rules.AttendanceWindow.ClosesAfterEnd.TotalMinutes);
+        var isActive = await db.Sessions.AnyAsync(s => s.Id == req.SessionId
+            && s.Status != "cancelled" && s.StartAt <= now && s.EndAt >= floor, ct);
+        if (!isActive) return BadRequest(new { error = "La clase no está activa en este momento." });
+
+        try
+        {
+            var result = await checkin.RegisterForSessionAsync(studentId.Value, req.SessionId,
+                AttendanceSource.QrStudent, ct);
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    private static bool IsDemoUser(string? email) =>
+        email is not null && email.EndsWith("@mambo.local", StringComparison.OrdinalIgnoreCase);
 
     private Task<Guid?> MyStudentIdAsync(CancellationToken ct) =>
         db.Students.Where(s => s.UserId == me.UserIdOrThrow())

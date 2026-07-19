@@ -1686,3 +1686,31 @@ PENDIENTE (no bloqueante) para cerrar la Tarea 8 al 100%:
         REDIRECCIÓN (Checkout Pro), se permite cobrar por fuera de la tienda.
       - Orden sugerido: 1) privacidad/términos 2) eliminar cuenta 3) assets de
         ficha 4) TWA + Play Console 5) (futuro) iOS.
+
+==========================================================================
+2026-07-18 — FIX scanner QR (crash) + marcado DEMO sin QR
+==========================================================================
+[E65] FIX crash del escáner de QR: al abrir la cámara y no arrancar (permiso
+      denegado / sin cámara), html5-qrcode lanzaba "Cannot stop, scanner is not
+      running or paused" de forma SINCRÓNICA (el .catch async no la atrapaba) y
+      tumbaba toda la app sin botón para volver. Ahora QrScanner:
+      - solo llama stop() si getState() es SCANNING/PAUSED; si no, clear();
+      - todo envuelto en try/catch (sync + async);
+      - el callback onScan va en un ref, así el efecto NO se re-monta en cada
+        render (antes el scanner se reiniciaba constantemente).
+      + Nuevo app/error.tsx (error boundary): si una pantalla crashea, muestra
+        "Ups, algo falló" con botones Reintentar / Volver al inicio, en vez de la
+        pantalla trabada sin salida.
+
+[E66] MARCADO DEMO sin QR (para el ambiente desplegado con usuarios mockeados):
+      Los usuarios demo (correo @mambo.local) no están en la academia ni tienen
+      el QR. Ahora, en "Marcar asistencia", en vez del botón Escanear ven
+      "Marcar (demo)" que marca directo la clase activa elegida, SIN cámara.
+      - Backend: POST /api/me/scan-demo { sessionId }. Valida en el SERVIDOR que
+        el correo del usuario termine en @mambo.local (403 si no) y que la sesión
+        esté realmente activa (misma ventana que active-classes). Reusa el mismo
+        RegisterForSessionAsync que el escaneo real → misma lógica, anti-duplicado.
+      - Frontend: me/page detecta el usuario demo por su email y muestra el botón
+        de marcado simulado; el escáner queda solo para usuarios reales.
+      Verificado E2E: ana@mambo.local marca sin QR (queda pendiente, repetir no
+      duplica); un usuario con email real recibe 403.

@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/useAuth";
 import {
-  getMyPanel, getMyQr, getActiveClasses, scanCheckIn,
+  getMyPanel, getMyQr, getActiveClasses, scanCheckIn, scanDemoCheckIn,
   StudentPanel, MyQr, ActiveClass, ApiError,
 } from "@/lib/api";
 import { Shell, PageHeader } from "@/components/ui/TopBar";
 import { Card, Stat, Badge, Button, Skeleton, Avatar } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
-import { IconTicket, IconCalendar, IconCash, IconQr, IconCamera, IconClock, IconX, IconSpark } from "@/components/ui/Icons";
+import { IconTicket, IconCalendar, IconCash, IconQr, IconCamera, IconClock, IconX, IconSpark, IconCheck } from "@/components/ui/Icons";
 import { PassBadge, StatusBadge, fmtDate, kindLabel, debtDisplay } from "@/components/format";
 import StudentQr from "@/components/StudentQr";
 import QrScanner from "@/components/QrScanner";
@@ -53,6 +53,10 @@ export default function MyPanel() {
     loadActive();
   });
 
+  // Usuario de demostración (mock): correo @mambo.local. En el ambiente desplegado
+  // no está en la academia ni tiene el QR, así que puede marcar asistencia simulada.
+  const isDemo = (session?.email ?? "").toLowerCase().endsWith("@mambo.local");
+
   const onScan = async (text: string) => {
     if (busy) return;
     setBusy(true);
@@ -64,6 +68,22 @@ export default function MyPanel() {
       loadActive();
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "No se pudo marcar. Volvé a escanear.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Marcado simulado para usuarios demo: salta la cámara y marca directo la clase.
+  const onMarkDemo = async (sessionId: string) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await scanDemoCheckIn(sessionId);
+      toast.success("¡Asistencia marcada (demo)! Queda pendiente de confirmación del profe.");
+      loadPanel();
+      loadActive();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "No se pudo marcar.");
     } finally {
       setBusy(false);
     }
@@ -124,7 +144,9 @@ export default function MyPanel() {
               <span className="text-lime"><IconCamera /></span> Marcar asistencia
             </h2>
             <p className="mb-4 text-sm text-muted">
-              Elegí la clase que estás por tomar y escaneá el QR de la academia.
+              {isDemo
+                ? "Modo demo: elegí una de las clases activas y marcá tu asistencia sin escanear el QR."
+                : "Elegí la clase que estás por tomar y escaneá el QR de la academia."}
             </p>
 
             {scanning ? (
@@ -156,9 +178,15 @@ export default function MyPanel() {
                         {fmtHm(c.startAt)}–{fmtHm(c.endAt)} · {c.style} · {c.level}
                       </p>
                     </div>
-                    <Button className="btn-sm" onClick={() => setScanning(true)} loading={busy} icon={<IconQr />}>
-                      Escanear
-                    </Button>
+                    {isDemo ? (
+                      <Button className="btn-sm" onClick={() => onMarkDemo(c.id)} loading={busy} icon={<IconCheck />}>
+                        Marcar (demo)
+                      </Button>
+                    ) : (
+                      <Button className="btn-sm" onClick={() => setScanning(true)} loading={busy} icon={<IconQr />}>
+                        Escanear
+                      </Button>
+                    )}
                   </div>
                 ))}
               </div>

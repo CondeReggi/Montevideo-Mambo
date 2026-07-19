@@ -293,6 +293,10 @@ export const getActiveClasses = () => api<ActiveClass[]>("/api/me/active-classes
 export const scanCheckIn = (token: string) =>
   api<CheckInResult>("/api/me/scan", { method: "POST", body: JSON.stringify({ token }) });
 
+// Marcado SIMULADO (solo usuarios demo @mambo.local): salta el escaneo del QR.
+export const scanDemoCheckIn = (sessionId: string) =>
+  api<CheckInResult>("/api/me/scan-demo", { method: "POST", body: JSON.stringify({ sessionId }) });
+
 // ---- Pantalla de la academia (Modo B): QR dinámico por clase activa ----
 export interface DisplaySession {
   id: string; className: string; style: string; level: string;
