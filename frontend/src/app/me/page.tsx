@@ -25,6 +25,7 @@ export default function MyPanel() {
   const [error, setError] = useState<string | null>(null);
   const [myQr, setMyQr] = useState<MyQr | null>(null);
   const [active, setActive] = useState<ActiveClass[]>([]);
+  const [activeError, setActiveError] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -34,7 +35,11 @@ export default function MyPanel() {
       .catch((e) => setError(e instanceof ApiError ? e.message : "No se pudo cargar."));
   }, []);
   const loadActive = useCallback(() => {
-    getActiveClasses().then(setActive).catch(() => setActive([]));
+    // Distingue "no hay clases" de un ERROR de carga: antes cualquier fallo (token
+    // vencido, backend caído) se veía igual que "No hay clases corriendo".
+    getActiveClasses()
+      .then((c) => { setActive(c); setActiveError(false); })
+      .catch(() => { setActive([]); setActiveError(true); });
   }, []);
 
   useEffect(() => {
@@ -128,6 +133,11 @@ export default function MyPanel() {
                 <Button variant="ghost" onClick={() => setScanning(false)} icon={<IconX />} className="mx-auto">
                   Cancelar
                 </Button>
+              </div>
+            ) : activeError ? (
+              <div className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+                No se pudieron cargar las clases. Revisá tu conexión.
+                <Button variant="ghost" className="btn-sm" onClick={loadActive}>Reintentar</Button>
               </div>
             ) : active.length === 0 ? (
               <p className="rounded-xl bg-ink-900/40 px-4 py-3 text-sm text-muted-dim">
