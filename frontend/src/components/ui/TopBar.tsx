@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Logo } from "./Logo";
-import { Avatar } from "./index";
+import { Avatar, Spinner } from "./index";
 import { IconLogout, IconQr, IconUsers, IconCalendar, IconCash, IconTicket, IconSpark, IconGear, IconMenu, IconX } from "./Icons";
 import { getSession, Session } from "@/lib/auth";
 import { endSession } from "@/lib/api";
@@ -64,10 +64,16 @@ export function TopBar() {
     };
   }, [menuOpen]);
 
+  const [loggingOut, setLoggingOut] = useState(false);
   const logout = async () => {
+    if (loggingOut) return; // evita disparar la acción varias veces (backend lento / cold start)
+    setLoggingOut(true);
     setMenuOpen(false);
-    await endSession();
-    router.push("/login");
+    try {
+      await endSession();
+    } finally {
+      router.push("/login");
+    }
   };
 
   const items = session ? NAV.filter((n) => n.roles.some((r) => session.roles.includes(r))) : [];
@@ -133,10 +139,11 @@ export function TopBar() {
               </Link>
               <button
                 onClick={logout}
+                disabled={loggingOut}
                 title="Cerrar sesión"
-                className="hidden h-9 w-9 place-items-center rounded-lg border border-ink-500 text-muted transition hover:border-red-500/40 hover:text-red-300 md:grid lg:h-10 lg:w-10 lg:text-lg"
+                className="hidden h-9 w-9 place-items-center rounded-lg border border-ink-500 text-muted transition hover:border-red-500/40 hover:text-red-300 disabled:opacity-60 md:grid lg:h-10 lg:w-10 lg:text-lg"
               >
-                <IconLogout />
+                {loggingOut ? <Spinner className="h-4 w-4" /> : <IconLogout />}
               </button>
             </>
           ) : (
@@ -221,12 +228,13 @@ export function TopBar() {
               </Link>
               <button
                 onClick={logout}
-                className="flex items-center gap-3 rounded-xl px-3.5 py-3 text-left text-sm font-medium text-red-300 transition hover:bg-red-500/10"
+                disabled={loggingOut}
+                className="flex items-center gap-3 rounded-xl px-3.5 py-3 text-left text-sm font-medium text-red-300 transition hover:bg-red-500/10 disabled:opacity-60"
               >
                 <span className="text-lg">
-                  <IconLogout />
+                  {loggingOut ? <Spinner className="h-5 w-5" /> : <IconLogout />}
                 </span>
-                Cerrar sesión
+                {loggingOut ? "Cerrando sesión…" : "Cerrar sesión"}
               </button>
               <SocialLinks className="justify-center pt-2" />
             </div>

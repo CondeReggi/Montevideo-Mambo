@@ -1724,3 +1724,13 @@ PENDIENTE (no bloqueante) para cerrar la Tarea 8 al 100%:
       del botón Escanear/Marcar (demo). Antes, tras marcar y confirmar, al volver
       aparecía de nuevo el botón y parecía que no había marcado.
       Verificado E2E: null -> Pending (al marcar) -> Confirmed (al confirmar el profe).
+
+==========================================================================
+2026-07-18 — FIX: estado de carga en "Cerrar sesión"
+==========================================================================
+[E68] El botón de cerrar sesión (escritorio y drawer móvil) era un <button>
+      plano sin feedback: con el backend lento (cold start de Render) uno no
+      sabía si estaba pasando algo y martillaba el botón. Ahora muestra un
+      spinner ("Cerrando sesión…" en el drawer), se deshabilita mientras corre y
+      la función ignora clics repetidos (guarda loggingOut). El resto de los
+      botones de acción ya usaban <Button loading> con spinner.
