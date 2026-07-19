@@ -51,7 +51,9 @@ public class MeController(
         var now = clock.UtcNow;
         // "Activa" = ahora dentro de [inicio, fin + 30min], por instante absoluto (UTC).
         var floor = now.AddMinutes(-(int)Mambo.Domain.Rules.AttendanceWindow.ClosesAfterEnd.TotalMinutes);
-        var active = await db.Sessions
+        var studentId = await MyStudentIdAsync(ct);
+
+        var sessions = await db.Sessions
             .Where(s => s.Status != "cancelled" && s.StartAt <= now && s.EndAt >= floor)
             .OrderBy(s => s.StartAt)
             .Select(s => new
@@ -60,6 +62,23 @@ public class MeController(
                 className = s.Class.Name, s.Class.Style, s.Class.Level
             })
             .ToListAsync(ct);
+
+        // Estado de asistencia del alumno en cada clase activa: así el front NO ofrece
+        // marcar de nuevo una que ya marcó (muestra "Pendiente"/"Asistida" en su lugar).
+        var mine = new Dictionary<Guid, AttendanceStatus>();
+        if (studentId is Guid sid && sessions.Count > 0)
+        {
+            var ids = sessions.Select(x => x.Id).ToList();
+            mine = await db.Attendances
+                .Where(a => a.StudentId == sid && ids.Contains(a.ClassSessionId))
+                .ToDictionaryAsync(a => a.ClassSessionId, a => a.Status, ct);
+        }
+
+        var active = sessions.Select(s => new
+        {
+            s.Id, s.StartAt, s.EndAt, s.className, s.Style, s.Level,
+            myStatus = mine.TryGetValue(s.Id, out var st) ? st.ToString() : null
+        });
         return Ok(active);
     }
 

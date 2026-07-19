@@ -1714,3 +1714,13 @@ PENDIENTE (no bloqueante) para cerrar la Tarea 8 al 100%:
         de marcado simulado; el escáner queda solo para usuarios reales.
       Verificado E2E: ana@mambo.local marca sin QR (queda pendiente, repetir no
       duplica); un usuario con email real recibe 403.
+
+==========================================================================
+2026-07-18 — FIX: no permitir marcar dos veces la misma clase
+==========================================================================
+[E67] active-classes ahora incluye myStatus: el estado de asistencia del alumno
+      en cada clase activa (null si todavía no marcó). El front, si ya está
+      Pending o Confirmed, muestra el estado ("Pendiente"/"Asistida") en lugar
+      del botón Escanear/Marcar (demo). Antes, tras marcar y confirmar, al volver
+      aparecía de nuevo el botón y parecía que no había marcado.
+      Verificado E2E: null -> Pending (al marcar) -> Confirmed (al confirmar el profe).

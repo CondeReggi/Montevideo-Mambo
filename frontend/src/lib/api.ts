@@ -288,6 +288,8 @@ export const getMyQr = () => api<MyQr>("/api/me/qr");
 
 export interface ActiveClass {
   id: string; className: string; style: string; level: string; startAt: string; endAt: string;
+  // Estado de la asistencia del alumno en esta clase: null = todavía no marcó.
+  myStatus: string | null;
 }
 export const getActiveClasses = () => api<ActiveClass[]>("/api/me/active-classes");
 export const scanCheckIn = (token: string) =>

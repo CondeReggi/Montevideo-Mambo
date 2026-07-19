@@ -178,7 +178,10 @@ export default function MyPanel() {
                         {fmtHm(c.startAt)}–{fmtHm(c.endAt)} · {c.style} · {c.level}
                       </p>
                     </div>
-                    {isDemo ? (
+                    {c.myStatus === "Pending" || c.myStatus === "Confirmed" ? (
+                      // Ya marcó esta clase: se muestra el estado, no se puede marcar de nuevo.
+                      <StatusBadge status={c.myStatus} />
+                    ) : isDemo ? (
                       <Button className="btn-sm" onClick={() => onMarkDemo(c.id)} loading={busy} icon={<IconCheck />}>
                         Marcar (demo)
                       </Button>
