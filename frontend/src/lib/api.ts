@@ -1,4 +1,5 @@
 import { getToken, getSession, getRefreshToken, updateTokens, clearSession } from "./auth";
+import { trackSlow } from "./connecting";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5080";
 
@@ -66,11 +67,11 @@ export async function endSession(): Promise<void> {
   const refreshToken = getSession()?.refreshToken;
   if (refreshToken) {
     try {
-      await fetch(`${API_URL}/api/auth/logout`, {
+      await trackSlow(fetch(`${API_URL}/api/auth/logout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refreshToken }),
-      });
+      }));
     } catch {
       /* best-effort: aunque falle, igual limpiamos localmente */
     }
@@ -79,7 +80,13 @@ export async function endSession(): Promise<void> {
 }
 
 /** Llama al backend .NET adjuntando el JWT de sesión como Bearer. */
-export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
+export function api<T>(path: string, options: RequestInit = {}): Promise<T> {
+  // Envuelve la llamada en el rastreador de lentitud: si tarda +3s (cold start),
+  // se enciende el indicador global "Conectando…".
+  return trackSlow(apiInner<T>(path, options));
+}
+
+async function apiInner<T>(path: string, options: RequestInit): Promise<T> {
   let res = await rawFetch(path, options);
 
   // 401 en un endpoint normal → intentar renovar una vez y reintentar.

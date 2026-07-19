@@ -1734,3 +1734,17 @@ PENDIENTE (no bloqueante) para cerrar la Tarea 8 al 100%:
       spinner ("Cerrando sesión…" en el drawer), se deshabilita mientras corre y
       la función ignora clics repetidos (guarda loggingOut). El resto de los
       botones de acción ya usaban <Button loading> con spinner.
+
+==========================================================================
+2026-07-18 — Indicador global "Conectando…" (cold start)
+==========================================================================
+[E69] Feedback global para cuando el backend tarda (Render free se duerme). En
+      vez de poner spinner botón por botón, se instrumentó el cliente HTTP:
+      - lib/connecting.ts: store mínimo + trackSlow(promise, 3000) que enciende
+        un contador si la petición no termina en 3s (umbral elegido para no
+        parpadear en las rápidas; algunas demoran un poco).
+      - api.ts: api() envuelve su cuerpo en trackSlow (cubre login y todo lo
+        autenticado); endSession() (logout) también.
+      - components/ConnectingIndicator.tsx: pill fijo arriba al centro con
+        spinner + "Conectando…", montado global en layout. Aparece solo si una
+        petición pasa los 3s y se apaga al terminar.

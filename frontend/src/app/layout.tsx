@@ -6,6 +6,7 @@ import { ToastProvider } from "@/components/ui/Toast";
 import { DialogProvider } from "@/components/ui/Dialog";
 import { RefreshProvider, PullToRefresh } from "@/components/Refresh";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
+import ConnectingIndicator from "@/components/ConnectingIndicator";
 
 // Display tipo póster (coincide con los flyers de la marca) + cuerpo legible.
 const display = Anton({
@@ -83,6 +84,7 @@ export default function RootLayout({
           </ToastProvider>
           <PullToRefresh />
         </RefreshProvider>
+        <ConnectingIndicator />
         <ServiceWorkerRegister />
       </body>
     </html>
